@@ -1,3 +1,4 @@
+#para probar q funcione todo el lexer
 from lang.lexer import Lexer                                  
 from lang.tokens import TokenType
 from .errors import LexError 
