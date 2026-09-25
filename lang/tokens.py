@@ -53,7 +53,7 @@ class TokenType(Enum):
 @dataclass
 class Token:
     type: TokenType
-    value: str        # el texto original: "80", "health", "if"
+    value: str        
     line: int
     col: int
 
