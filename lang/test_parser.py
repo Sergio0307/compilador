@@ -5,55 +5,127 @@ from lang.tokens import TokenType
 from lang.errors import ParseError
 
 
-def main():
+def test_base():
+    """Los 5 helpers: peek, advance, check, match, expect."""
+    print("=== Base del parser ===")
     source = "creature Uruk\n"
     tokens = Lexer(source, "test.ins").tokenize()
 
     p = Parser(tokens, "test.ins")
 
-    # 1. peek() → estamos en CREATURE
+    # 1. peek() -> estamos en CREATURE
     print("1. peek:", p.peek())
-    assert p.peek().type == TokenType.CREATURE, "debería estar en CREATURE"
+    assert p.peek().type == TokenType.CREATURE, "deberia estar en CREATURE"
 
-    # 2. advance() → consumimos CREATURE y avanzamos
+    # 2. advance() -> consumimos CREATURE y avanzamos
     tok = p.advance()
     print("2. advance:", tok)
     assert tok.type == TokenType.CREATURE
 
-    # 3. peek() → ahora estamos en IDENT("Uruk")
+    # 3. peek() -> ahora estamos en IDENT("Uruk")
     print("3. peek:", p.peek())
     assert p.peek().type == TokenType.IDENT
 
-    # 4. check() → no consume
+    # 4. check() -> no consume
     print("4. check(IDENT):", p.check(TokenType.IDENT))
     assert p.check(TokenType.IDENT) is True
     print("   sigue en:", p.peek())
     assert p.peek().type == TokenType.IDENT, "check no debe consumir"
 
-    # 5. match() → consume si coincide
+    # 5. match() -> consume si coincide
     tok = p.match(TokenType.IDENT)
     print("5. match(IDENT):", tok)
     assert tok is not None and tok.value == "Uruk"
 
-    # 6. match() → devuelve None si no coincide y no consume
+    # 6. match() -> devuelve None si no coincide y no consume
     tok = p.match(TokenType.IF)
     print("6. match(IF):", tok)
     assert tok is None
 
-    # 7. expect() → OK cuando coincide
+    # 7. expect() -> OK cuando coincide
     tok = p.expect(TokenType.NEWLINE)
     print("7. expect(NEWLINE):", tok)
     assert tok.type == TokenType.NEWLINE
 
-    # 8. expect() → lanza ParseError cuando no coincide
-    print("8. expect(IF) → debe fallar:")
+    # 8. expect() -> lanza ParseError cuando no coincide
+    print("8. expect(IF): debe fallar")
     try:
         p.expect(TokenType.IF)
-        print("   ERROR: no lanzó ParseError")
+        print("   ERROR: no lanzo ParseError")
+        raise AssertionError("expect deberia haber lanzado ParseError")
     except ParseError as e:
         print("   OK, ParseError:", e)
 
-    print("\n=== Base del parser OK ===")
+    print("=== Base del parser OK ===\n")
+
+
+def test_primary():
+    """parse_primary: numeros, strings, identificadores, parentesis."""
+    print("=== parse_primary ===")
+    casos = [
+        ("42",         "Number(value=42, line=1)"),
+        ('"hola"',     "String(value='hola', line=1)"),
+        ("health",     "Identifier(name='health', line=1)"),
+        ("random",     "Identifier(name='random', line=1)"),
+        ("(42)",       "Number(value=42, line=1)"),
+        ("enemy_dist", "Identifier(name='enemy_dist', line=1)"),
+        ("vision",     "Identifier(name='vision', line=1)"),
+        ("lifespan",   "Identifier(name='lifespan', line=1)"),
+        ("see(1, 2)",  "Call(name='see', args=[Number(value=1, line=1), "
+                       "Number(value=2, line=1)], line=1)"),
+    ]
+    for src, esperado in casos:
+        tokens = Lexer(src + "\n", "test.ins").tokenize()
+        p = Parser(tokens, "test.ins")
+        expr = p.parse_primary()
+        print("  %-12r -> %s" % (src, expr))
+        assert str(expr) == esperado, \
+            "esperado %r, obtenido %r" % (esperado, str(expr))
+    print("=== parse_primary OK ===\n")
+
+
+def test_unary():
+    """parse_unary: -x, not x y apilamiento de operadores de prefijo."""
+    print("=== parse_unary ===")
+    casos = [
+        ("-42",     "UnaryOp(op='-', operand=Number(value=42, line=1), line=1)"),
+        ("not scared",
+                    "UnaryOp(op='not', operand=Identifier(name='scared', line=1), line=1)"),
+        ("--5",     "UnaryOp(op='-', operand=UnaryOp(op='-', "
+                    "operand=Number(value=5, line=1), line=1), line=1)"),
+        ("not not x",
+                    "UnaryOp(op='not', operand=UnaryOp(op='not', "
+                    "operand=Identifier(name='x', line=1), line=1), line=1)"),
+        ("(-5)",    "UnaryOp(op='-', operand=Number(value=5, line=1), line=1)"),
+        ("not (x)", "UnaryOp(op='not', operand=Identifier(name='x', line=1), line=1)"),
+        ("-random", "UnaryOp(op='-', operand=Identifier(name='random', line=1), line=1)"),
+        ("42",      "Number(value=42, line=1)"),
+    ]
+    for src, esperado in casos:
+        tokens = Lexer(src + "\n", "test.ins").tokenize()
+        p = Parser(tokens, "test.ins")
+        expr = p.parse_unary()
+        print("  %-12r -> %s" % (src, expr))
+        assert str(expr) == esperado, \
+            "esperado %r, obtenido %r" % (esperado, str(expr))
+
+    # '-' solo debe fallar
+    print("  %-12r -> debe fallar" % "-")
+    tokens = Lexer("-\n", "test.ins").tokenize()
+    p = Parser(tokens, "test.ins")
+    try:
+        p.parse_unary()
+        raise AssertionError("'-' solo deberia lanzar ParseError")
+    except ParseError as e:
+        print("     OK, ParseError:", e)
+
+    print("=== parse_unary OK ===\n")
+
+
+def main():
+    test_base()
+    test_primary()
+    test_unary()
 
 
 if __name__ == "__main__":

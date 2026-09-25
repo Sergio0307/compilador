@@ -54,18 +54,21 @@ class Call:
 class Number:
     """80, 6, 400, 15..."""
     value: int
+    line: int = 0               # línea donde aparece el literal
 
 
 @dataclass
 class String:
     """"meat is back on the menu" (sin las comillas)"""
     value: str
+    line: int = 0               # línea donde aparece el literal
 
 
 @dataclass
 class Identifier:
     """health, enemy_dist, GROUND, random, start..."""
     name: str
+    line: int = 0               # línea donde aparece el identificador
 
 
 @dataclass
@@ -74,6 +77,7 @@ class BinaryOp:
     op: str                     # "+", "-", "<", "==", "and", "or", ...
     left: object                # nodo de expresión
     right: object               # nodo de expresión
+    line: int = 0               # línea del operador
 
 
 @dataclass
@@ -81,5 +85,6 @@ class UnaryOp:
     """-a, not a"""
     op: str                     # "-", "not"
     operand: object             # nodo de expresión
+    line: int = 0               # línea del operador
 
 
