@@ -15,3 +15,7 @@ class InstinctError(Exception):
 
 class LexError(InstinctError):
     pass
+
+
+class ParseError(InstinctError):
+    pass
