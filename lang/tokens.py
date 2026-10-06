@@ -2,28 +2,12 @@ from enum import Enum, auto
 from dataclasses import dataclass
 
 class TokenType(Enum):
-    # --- Palabras reservadas: cabecera ---
-    CREATURE = auto()
-    FACTION  = auto()
-    HEALTH   = auto()
-    VISION   = auto()
-    LIFESPAN = auto()
-
-    # --- Palabras reservadas: control ---
+    # --- Palabras reservadas (las unicas del lenguaje, spec 2.3) ---
     IF    = auto()
     GOTO  = auto()
     AND   = auto()
     OR    = auto()
     NOT   = auto()
-
-    # --- Built-ins ---
-    MOVE      = auto()
-    CONSUME   = auto()
-    REPRODUCE = auto()
-    SAY       = auto()
-    ROAR      = auto()
-    SEE       = auto()
-    RANDOM    = auto()
 
     # --- Literales e identificadores ---
     NUMBER = auto()
@@ -36,7 +20,9 @@ class TokenType(Enum):
     RPAREN  = auto()   # )
     COMMA   = auto()   # ,
     LT      = auto()   # <
+    LE      = auto()   # <=
     GT      = auto()   # >
+    GE      = auto()   # >=
     EQ      = auto()   # ==
     NEQ     = auto()   # !=
     PLUS    = auto()   # +

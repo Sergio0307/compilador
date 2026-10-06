@@ -2,25 +2,13 @@ from .tokens import Token, TokenType
 from .errors import LexError
 
 
-# Mapa de palabras reservadas → TokenType
+# Mapa de palabras reservadas → TokenType (las unicas del lenguaje)
 KEYWORDS = {
-    "creature": TokenType.CREATURE,
-    "faction":  TokenType.FACTION,
-    "health":   TokenType.HEALTH,
-    "vision":   TokenType.VISION,
-    "lifespan": TokenType.LIFESPAN,
-    "if":       TokenType.IF,
-    "goto":     TokenType.GOTO,
-    "and":      TokenType.AND,
-    "or":       TokenType.OR,
-    "not":      TokenType.NOT,
-    "move":      TokenType.MOVE,
-    "consume":   TokenType.CONSUME,
-    "reproduce": TokenType.REPRODUCE,
-    "say":       TokenType.SAY,
-    "roar":      TokenType.ROAR,
-    "see":       TokenType.SEE,
-    "random":    TokenType.RANDOM,
+    "if":    TokenType.IF,
+    "goto":  TokenType.GOTO,
+    "and":   TokenType.AND,
+    "or":    TokenType.OR,
+    "not":   TokenType.NOT,
 }
 
 # Símbolos de un solo carácter
@@ -42,6 +30,8 @@ SYMBOLS_1 = {
 SYMBOLS_2 = {
     "==": TokenType.EQ,
     "!=": TokenType.NEQ,
+    "<=": TokenType.LE,
+    ">=": TokenType.GE,
 }
 
 

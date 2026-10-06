@@ -6,6 +6,12 @@ from lang.ast_nodes import (
 )
 from lang.errors import ParseError
 
+COMPARISON_TYPES = (
+    TokenType.LT, TokenType.LE,
+    TokenType.GT, TokenType.GE,
+    TokenType.EQ, TokenType.NEQ,
+)
+
 class Parser:
     def __init__(self, tokens, filename="<input>"):
         self.tokens   = tokens
@@ -57,7 +63,7 @@ class Parser:
 
 
     def parse_primary(self):
-        """Nivel mas basico: numeros, strings, identificadores, parentesis."""
+        """Nivel mas basico: numeros, strings, identificadores, llamadas, parentesis."""
         tok = self.peek()
 
         # Numero
@@ -70,32 +76,13 @@ class Parser:
             self.advance()
             return String(tok.value, line=tok.line)
 
-        # Identificador cualquiera (enemy_dist, GROUND, start, ...)
+        # Identificador: variable, percepcion o funcion (see, name, ...).
+        # Un identificador seguido de '(' es una llamada: see(x, y), name(x, y)
         if tok.type == TokenType.IDENT:
             self.advance()
+            if self.match(TokenType.LPAREN):
+                return self.parse_call_args(tok)
             return Identifier(tok.value, line=tok.line)
-
-        # 'random' es un built-in que se comporta como valor:
-        # se usa en expresiones como "random % 3"
-        if tok.type == TokenType.RANDOM:
-            self.advance()
-            return Identifier("random", line=tok.line)
-
-        # 'health', 'vision' y 'lifespan' son palabras clave por el lexer
-        # pero tambien variables legibles de la criatura ("if health < 30")
-        if tok.type in (TokenType.HEALTH, TokenType.VISION, TokenType.LIFESPAN):
-            self.advance()
-            return Identifier(tok.value, line=tok.line)
-
-        # 'see(x, y)' es un built-in con parentesis obligatorios
-        if tok.type == TokenType.SEE:
-            self.advance()
-            self.expect(TokenType.LPAREN)
-            x = self.parse_expression()
-            self.expect(TokenType.COMMA)
-            y = self.parse_expression()
-            self.expect(TokenType.RPAREN)
-            return Call("see", [x, y], line=tok.line)
 
         # Parentesis: (expr)
         if tok.type == TokenType.LPAREN:
@@ -110,25 +97,92 @@ class Parser:
             line=tok.line, col=tok.col, filename=self.filename,
         )
 
-    def parse_unary(self):
-        """Operadores de prefijo: -x, not x. Si no hay ninguno, es primaria.
+    def parse_call_args(self, name_tok):
+        """Consume los argumentos y el ')' de una llamada ya abierta.
+           Admite lista vacia: f()"""
+        args = []
+        if not self.check(TokenType.RPAREN):
+            args.append(self.parse_expression())
+            while self.match(TokenType.COMMA):
+                args.append(self.parse_expression())
+        self.expect(TokenType.RPAREN)
+        return Call(name_tok.value, args, line=name_tok.line)
 
-           Llama a parse_unary (no a parse_primary) para que los operadores
-           se apilen: - - 5, not not x."""
+    def parse_unary(self):
+        """Operadores de prefijo: -x. Si no hay ninguno, es primaria.
+           Llama a parse_unary (no a parse_primary) para que se apilen: - - 5."""
         tok = self.peek()
 
         if tok.type == TokenType.MINUS:
             self.advance()
             return UnaryOp("-", self.parse_unary(), line=tok.line)
 
-        if tok.type == TokenType.NOT:
-            self.advance()
-            return UnaryOp("not", self.parse_unary(), line=tok.line)
-
         return self.parse_primary()
 
-    def parse_expression(self):
-        """Punto de entrada para cualquier expresion.
-           De momento delega en parse_unary; luego subiremos a parse_or."""
-        return self.parse_unary()
+    # Expresiones: cadena de precedencia (de menor a mayor)
+    # or -> and -> not -> comparaciones -> + - -> * / % -> unary -> primary
+    # Estilo Python (spec 2.5): el encadenado a < b < c vale a < b and b < c
 
+    def parse_or(self):
+        left = self.parse_and()
+        while self.check(TokenType.OR):
+            op = self.advance()
+            right = self.parse_and()
+            left = BinaryOp("or", left, right, line=op.line)
+        return left
+
+    def parse_and(self):
+        left = self.parse_not()
+        while self.check(TokenType.AND):
+            op = self.advance()
+            right = self.parse_not()
+            left = BinaryOp("and", left, right, line=op.line)
+        return left
+
+    def parse_not(self):
+        """'not' esta entre 'and' y las comparaciones, como en Python:
+           not a < b  ->  not (a < b)"""
+        if self.check(TokenType.NOT):
+            tok = self.advance()
+            return UnaryOp("not", self.parse_not(), line=tok.line)
+        return self.parse_comparison()
+
+    def parse_comparison(self):
+        """Comparaciones asociativas por la izquierda; encadenadas estilo Python:
+           a < b < c  ->  (a < b) and (b < c)"""
+        left = self.parse_term()
+        if self.peek().type not in COMPARISON_TYPES:
+            return left
+        result = None
+        while self.peek().type in COMPARISON_TYPES:
+            op = self.advance()
+            right = self.parse_term()
+            cmp = BinaryOp(op.value, left, right, line=op.line)
+            result = cmp if result is None else \
+                BinaryOp("and", result, cmp, line=op.line)
+            left = right
+        return result
+
+    def parse_term(self):
+        left = self.parse_factor()
+        while self.peek().type in (TokenType.PLUS, TokenType.MINUS):
+            op = self.advance()
+            right = self.parse_factor()
+            left = BinaryOp(op.value, left, right, line=op.line)
+        return left
+
+    def parse_factor(self):
+        left = self.parse_unary()
+        while self.peek().type in (TokenType.STAR, TokenType.SLASH, TokenType.PERCENT):
+            op = self.advance()
+            right = self.parse_unary()
+            left = BinaryOp(op.value, left, right, line=op.line)
+        return left
+
+    def parse_expression(self):
+        """Punto de entrada para cualquier expresion."""
+        return self.parse_or()
+    
+    
+    
+    
