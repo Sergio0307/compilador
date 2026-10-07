@@ -3,6 +3,9 @@ from lang.lexer import Lexer
 from lang.parser import Parser
 from lang.tokens import TokenType
 from lang.errors import ParseError
+from lang.ast_nodes import (
+    SpeciesDef, Block, Label, IfGoto, Goto, Call, Assign,
+)
 
 
 def test_base():
@@ -376,6 +379,155 @@ def test_statement():
     print("=== parse_statement OK ===\n")
 
 
+def test_species():
+    """parse_species: archivo completo -> SpeciesDef (spec 2.1)."""
+    print("=== parse_species ===")
+
+    # 1. Uruk completo: cabecera + cuerpo con varias etiquetas
+    uruk = """creature Uruk
+faction isengard
+health 80
+vision 6
+lifespan 400
+start:
+if health < 20 goto flee
+goto start
+flee:
+move(-enemy_dx, -enemy_dy, 3)
+goto start
+"""
+    p = Parser(Lexer(uruk, "uruk.ins").tokenize(), "uruk.ins")
+    sp = p.parse_species()
+    assert sp.name == "Uruk"
+    assert sp.faction == "isengard"
+    assert sp.health == 80
+    assert sp.vision == 6
+    assert sp.lifespan == 400
+    assert sp.line == 1
+    assert sp.header == [
+        ("creature", "Uruk", 1),
+        ("faction", "isengard", 2),
+        ("health", "80", 3),
+        ("vision", "6", 4),
+        ("lifespan", "400", 5),
+    ]
+    assert set(sp.blocks.keys()) == {"start", "flee"}
+    start = sp.blocks["start"]
+    assert start.label == "start"
+    assert len(start.instructions) == 2
+    assert isinstance(start.instructions[0], IfGoto)
+    assert start.instructions[0].label == "flee"
+    assert isinstance(start.instructions[1], Goto)
+    assert start.instructions[1].label == "start"
+    flee = sp.blocks["flee"]
+    assert len(flee.instructions) == 2
+    assert isinstance(flee.instructions[0], Call)
+    assert flee.instructions[0].name == "move"
+    assert len(flee.instructions[0].args) == 3
+    assert isinstance(flee.instructions[1], Goto)
+    assert p.peek().type == TokenType.EOF  # consumió todo el archivo
+    print("  OK, Uruk completo")
+
+    # 2. mini con dos bloques (asignación + acción + goto)
+    mini = """creature Mini
+faction f
+health 10
+vision 1
+lifespan 50
+start:
+steps = 0
+wander:
+move(1, 0, 1)
+goto start
+"""
+    sp = Parser(Lexer(mini, "mini.ins").tokenize(), "mini.ins").parse_species()
+    assert set(sp.blocks.keys()) == {"start", "wander"}
+    assert len(sp.blocks["start"].instructions) == 1
+    assert isinstance(sp.blocks["start"].instructions[0], Assign)
+    assert len(sp.blocks["wander"].instructions) == 2
+    assert isinstance(sp.blocks["wander"].instructions[0], Call)
+    assert isinstance(sp.blocks["wander"].instructions[1], Goto)
+    print("  OK, mini con dos bloques")
+
+    # 3. solo la etiqueta start, sin instrucciones
+    solo = """creature Solo
+faction f
+health 1
+vision 1
+lifespan 1
+start:
+"""
+    sp = Parser(Lexer(solo, "solo.ins").tokenize(), "solo.ins").parse_species()
+    assert sp.blocks["start"].instructions == []
+    print("  OK, solo start:")
+
+    # 4. claves faltantes: el parser no falla, deja '' / 0 (fase 3 decide)
+    sin_faction = """creature X
+health 5
+start:
+wait(1)
+"""
+    sp = Parser(Lexer(sin_faction, "x.ins").tokenize(), "x.ins").parse_species()
+    assert sp.faction == ""
+    assert sp.lifespan == 0
+    assert sp.vision == 0
+    print("  OK, claves faltantes -> '' / 0 (los completa fase 3)")
+
+    # 5. líneas en blanco en el cuerpo: se saltan
+    con_blancos = """creature B
+faction f
+health 1
+vision 1
+lifespan 1
+start:
+
+wait(1)
+
+goto start
+"""
+    sp = Parser(Lexer(con_blancos, "b.ins").tokenize(), "b.ins").parse_species()
+    assert len(sp.blocks["start"].instructions) == 2
+    print("  OK, líneas en blanco en el cuerpo")
+
+    # 6. etiqueta duplicada (una ya cerrada)
+    dup = """creature D
+faction f
+health 1
+vision 1
+lifespan 1
+start:
+wait(1)
+start:
+goto start
+"""
+    try:
+        Parser(Lexer(dup, "d.ins").tokenize(), "d.ins").parse_species()
+        raise AssertionError("etiqueta duplicada no detectada")
+    except ParseError as e:
+        assert "duplicada" in str(e).lower()
+        print("  OK, duplicada no consecutiva:", e)
+
+    # 7. etiqueta duplicada consecutiva (la misma, seguida)
+    cons = """creature C
+faction f
+health 1
+vision 1
+lifespan 1
+start:
+wander:
+wander:
+goto start
+"""
+    try:
+        Parser(Lexer(cons, "c.ins").tokenize(), "c.ins").parse_species()
+        raise AssertionError("etiqueta duplicada consecutiva no detectada")
+    except ParseError as e:
+        assert "duplicada" in str(e).lower()
+        print("  OK, duplicada consecutiva:", e)
+
+    print("=== parse_species OK ===\n")
+
+
 def main():
     test_base()
     test_primary()
@@ -384,6 +536,7 @@ def main():
     test_precedence()
     test_header()
     test_statement()
+    test_species()
 
 
 if __name__ == "__main__":

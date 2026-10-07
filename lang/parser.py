@@ -167,6 +167,80 @@ class Parser:
         return entries
 
 
+    def _header_value(self, entries, key):
+        """Valor crudo de la primera entrada con esa clave, o '' si falta."""
+        for k, v, _ in entries:
+            if k == key:
+                return v
+        return ""
+
+    def _header_int(self, entries, key):
+        """Valor numérico de una clave de cabecera, o 0 si falta o no es un
+           número escrito como tal. (Rangos y validez: fase de semántica.)"""
+        try:
+            return int(self._header_value(entries, key))
+        except ValueError:
+            return 0
+
+    def parse_species(self):
+        """Punto de entrada: parsea un archivo .ins completo.
+           Cabecera ('id valor') + cuerpo agrupado en bloques por etiqueta.
+           Devuelve un SpeciesDef:
+             - nombre/facción y salud/visión/vida se rellenan best-effort
+               ('' o 0 si faltan); la fase de semántica valida y aplica
+               defaults. El campo `header` conserva lo crudo con su línea.
+             - 'start:' ausente o primera línea ≠ 'creature': lo detecta
+               parse_header. Etiqueta duplicada: ParseError aquí."""
+        entries = self.parse_header()
+
+        blocks = {}
+        current_label = None
+        current_instructions = []
+
+        while not self.check(TokenType.EOF):
+            self.skip_newlines()
+            node = self.parse_statement()
+
+            if isinstance(node, Label):
+                # Duplicada: ya cerrada (blocks) o la misma consecutiva
+                if node.name in blocks or node.name == current_label:
+                    raise ParseError(
+                        f"etiqueta duplicada '{node.name}'",
+                        line=node.line, col=None, filename=self.filename,
+                    )
+                if current_label is not None:
+                    blocks[current_label] = Block(current_label, current_instructions)
+                current_label = node.name
+                current_instructions = []
+            elif current_label is None:
+                # Defensivo: por construcción la primera etiqueta es 'start:'
+                raise ParseError(
+                    f"instrucción '{node.__class__.__name__}' antes de la "
+                    f"primera etiqueta",
+                    line=node.line, col=None, filename=self.filename,
+                )
+            else:
+                current_instructions.append(node)
+
+        # El último bloque se cierra al terminar el archivo
+        if current_label is not None:
+            blocks[current_label] = Block(current_label, current_instructions)
+
+        name = self._header_value(entries, "creature")
+        line = next((ln for k, _, ln in entries if k == "creature"), 1)
+
+        return SpeciesDef(
+            name=name,
+            faction=self._header_value(entries, "faction"),
+            health=self._header_int(entries, "health"),
+            vision=self._header_int(entries, "vision"),
+            lifespan=self._header_int(entries, "lifespan"),
+            blocks=blocks,
+            header=entries,
+            line=line,
+        )
+
+
     # Instrucciones del cuerpo (spec 2.3): una línea = una instrucción
 
 

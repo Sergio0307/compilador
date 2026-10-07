@@ -9,7 +9,10 @@ class InstinctError(Exception):
     def format(self):
         loc = ""
         if self.line is not None:
-            loc = f" ({self.filename}:{self.line}:{self.col})"
+            loc = f" ({self.filename}:{self.line}"
+            if self.col is not None:
+                loc += f":{self.col}"
+            loc += ")"
         return f"{self.message}{loc}"
 
 

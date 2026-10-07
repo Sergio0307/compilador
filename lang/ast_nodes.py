@@ -3,12 +3,13 @@ from dataclasses import dataclass
 @dataclass
 class SpeciesDef:
     """Toda la definición de una especie (un archivo .ins)."""
-    name: str                   # "Uruk"
-    faction: str                # "isengard"
-    health: int                 # 80
-    vision: int                 # 6
-    lifespan: int               # 400
+    name: str                   # "Uruk" (vacío si faltó la clave; fase 3)
+    faction: str                # "isengard" (vacío si faltó la clave; fase 3)
+    health: int                 # 80 (0 si faltó o no es número; fase 3)
+    vision: int                 # 6  (ídem)
+    lifespan: int               # 400 (ídem)
     blocks: dict                # {"start": Block, "wander": Block, ...}
+    header: list                # [(clave, valor, línea), ...] crudo: lo valida la fase 3
     line: int = 0               # línea donde aparece 'creature'
 
 
