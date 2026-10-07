@@ -16,6 +16,7 @@ class TokenType(Enum):
 
     # --- Simbolos ---
     COLON   = auto()   # :
+    ASSIGN  = auto()   # =
     LPAREN  = auto()   # (
     RPAREN  = auto()   # )
     COMMA   = auto()   # ,

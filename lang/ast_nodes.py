@@ -46,6 +46,14 @@ class Call:
     line: int = 0
 
 
+@dataclass
+class Assign:
+    """name = expr"""
+    name: str                   # "home_x"
+    expr: object                # nodo de expresión
+    line: int = 0               # línea del '='
+
+
 
 # Expresiones
 

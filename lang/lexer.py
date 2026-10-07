@@ -14,6 +14,7 @@ KEYWORDS = {
 # Símbolos de un solo carácter
 SYMBOLS_1 = {
     ":": TokenType.COLON,
+    "=": TokenType.ASSIGN,
     "(": TokenType.LPAREN,
     ")": TokenType.RPAREN,
     ",": TokenType.COMMA,

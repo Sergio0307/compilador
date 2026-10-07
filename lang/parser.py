@@ -1,7 +1,7 @@
 from lang.tokens import Token, TokenType
 from lang.ast_nodes import (
     SpeciesDef, Block,
-    IfGoto, Goto, Call,
+    IfGoto, Goto, Call, Assign,
     Number, String, Identifier, BinaryOp, UnaryOp,
 )
 from lang.errors import ParseError
@@ -57,6 +57,29 @@ class Parser:
                 line=tok.line, col=tok.col, filename=self.filename,
             )
         return self.advance()
+
+
+    # Instrucciones: solo la asignacion por ahora (spec 2.3: name = expr)
+
+
+    def at_assign(self):
+        """¿La línea actual es 'name = ...'? (IDENT seguido de '=')"""
+        return (self.peek().type == TokenType.IDENT
+                and self.peek(1).type == TokenType.ASSIGN)
+
+    def parse_assign(self):
+        """name = expr -> Assign. El '=' no puede ir dentro de una expresion
+           ni encadenarse: x = y = 5 es error."""
+        name_tok = self.expect(TokenType.IDENT)
+        eq = self.expect(TokenType.ASSIGN)
+        expr = self.parse_expression()
+        if self.check(TokenType.ASSIGN):
+            tok = self.peek()
+            raise ParseError(
+                "asignaciones encadenadas no permitidas (x = y = ...)",
+                line=tok.line, col=tok.col, filename=self.filename,
+            )
+        return Assign(name_tok.value, expr, line=eq.line)
 
 
     # Expresiones: nivel primario (atomos)
