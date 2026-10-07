@@ -236,12 +236,82 @@ def test_precedence():
     print("=== parse_expression OK ===\n")
 
 
+def test_header():
+    """parse_header: forma 'id valor' antes de 'start:' (spec 2.2)."""
+    print("=== parse_header ===")
+
+    # 1. cabecera completa, claves en orden libre
+    src = ("creature Uruk\n"
+           "lifespan 400\n"
+           "faction isengard\n"
+           "health 80\n"
+           "vision 6\n"
+           "start:\n")
+    p = Parser(Lexer(src, "test.ins").tokenize(), "test.ins")
+    entries = p.parse_header()
+    print("  completa:", entries)
+    assert entries == [
+        ("creature", "Uruk", 1),
+        ("lifespan", "400", 2),
+        ("faction", "isengard", 3),
+        ("health", "80", 4),
+        ("vision", "6", 5),
+    ]
+    # el cursor queda apuntando a 'start:' sin consumirlo
+    assert p.peek().type == TokenType.IDENT and p.peek().value == "start"
+    assert p.peek(1).type == TokenType.COLON
+    print("   OK, cursor en 'start:'")
+
+    # 2. líneas en blanco de por medio: se saltan
+    src = "creature Uruk\n\n\nhealth 80\n\nstart:\n"
+    p = Parser(Lexer(src, "test.ins").tokenize(), "test.ins")
+    entries = p.parse_header()
+    print("  en blanco:", entries)
+    assert entries == [("creature", "Uruk", 1), ("health", "80", 4)]
+    print("   OK, líneas en blanco ignoradas")
+
+    # 3. '-' delante de un número: forma válida (el rango es de semántica)
+    src = "creature Uruk\nhealth -80\nstart:\n"
+    p = Parser(Lexer(src, "test.ins").tokenize(), "test.ins")
+    entries = p.parse_header()
+    print("  negativo:", entries)
+    assert entries == [("creature", "Uruk", 1), ("health", "-80", 2)]
+    print("   OK, forma aceptada (fase 3 decide el rango)")
+
+    # 4. errores: (fuente, fragmento que debe aparecer en el mensaje)
+    casos = [
+        ("faction isengard\nstart:\n", "primera línea de la cabecera"),
+        ("start:\n",                   "primera línea no vacía"),
+        ("creature\nstart:\n",         "se esperaba un valor"),
+        ("creature Uruk\nhealth\nstart:\n", "se esperaba un valor"),
+        ("creature Uruk\nhealth 80 90\nstart:\n", "fin de línea"),
+        ("creature Uruk\nhealth 80 + 5\nstart:\n", "fin de línea"),
+        ("creature Uruk\nhealth -vida\nstart:\n", "se esperaba un número"),
+        ("creature Uruk\nif 5\nstart:\n", "clave de cabecera"),
+        ("creature Uruk\n",            "falta la etiqueta"),
+        ("",                           "falta la etiqueta"),
+    ]
+    for src, esperado in casos:
+        print("  %-42r -> debe fallar" % src)
+        p = Parser(Lexer(src, "test.ins").tokenize(), "test.ins")
+        try:
+            p.parse_header()
+            raise AssertionError("debio fallar: %r" % src)
+        except ParseError as e:
+            assert esperado.lower() in str(e).lower(), \
+                "esperaba %r en el mensaje, obtenido %r" % (esperado, str(e))
+            print("     OK, ParseError:", e)
+
+    print("=== parse_header OK ===\n")
+
+
 def main():
     test_base()
     test_primary()
     test_unary()
     test_not()
     test_precedence()
+    test_header()
 
 
 if __name__ == "__main__":

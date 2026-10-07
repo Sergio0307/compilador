@@ -59,6 +59,105 @@ class Parser:
         return self.advance()
 
 
+    # Utilidades de línea
+
+
+    def skip_newlines(self):
+        """Salta todos los NEWLINE seguidos (líneas en blanco)."""
+        while self.match(TokenType.NEWLINE):
+            pass
+
+    def at_start_label(self):
+        """¿Estamos en la etiqueta 'start:'? (IDENT 'start' + ':')"""
+        return (self.peek().type == TokenType.IDENT
+                and self.peek().value == "start"
+                and self.peek(1).type == TokenType.COLON)
+
+
+    # Cabecera (spec 2.2): líneas 'id valor' antes de 'start:'
+
+
+    def parse_header_value(self):
+        """Un valor de cabecera: nombre (IDENT o STRING) o número,
+           con '-' opcional delante. Solo valida la FORMA: rangos,
+           tipos y claves obligatorias son de la fase de semántica."""
+        neg = self.match(TokenType.MINUS)
+        tok = self.peek()
+        if tok.type not in (TokenType.IDENT, TokenType.NUMBER, TokenType.STRING):
+            raise ParseError(
+                f"se esperaba un valor (nombre o número), se encontró "
+                f"{tok.type.name} ({tok.value!r})",
+                line=tok.line, col=tok.col, filename=self.filename,
+            )
+        self.advance()
+        if neg and tok.type != TokenType.NUMBER:
+            raise ParseError(
+                f"después de '-' se esperaba un número, se encontró ({tok.value!r})",
+                line=tok.line, col=tok.col, filename=self.filename,
+            )
+        return ("-" if neg else "") + tok.value
+
+    def parse_header(self):
+        """Cabecera: todo lo que aparece antes de la etiqueta 'start:'.
+           Devuelve [(clave, valor, línea), ...] en orden de aparición.
+           No valida las cinco claves obligatorias ni los rangos (fase 3).
+           Deja el cursor apuntando a 'start:'."""
+        entries = []
+        while True:
+            self.skip_newlines()
+
+            # EOF sin haber visto 'start:' -> falta la etiqueta
+            if self.check(TokenType.EOF):
+                raise ParseError(
+                    "falta la etiqueta 'start:'",
+                    line=self.peek().line, col=self.peek().col,
+                    filename=self.filename,
+                )
+
+            # Fin de la cabecera: aparece 'start:'
+            if self.at_start_label():
+                if not entries:
+                    raise ParseError(
+                        "la primera línea no vacía debe ser 'creature <nombre>'",
+                        line=self.peek().line, col=self.peek().col,
+                        filename=self.filename,
+                    )
+                break
+
+            # Cada línea tiene la forma: id valor
+            key = self.peek()
+            if key.type != TokenType.IDENT:
+                raise ParseError(
+                    f"se esperaba una clave de cabecera (id valor), se encontró "
+                    f"{key.type.name} ({key.value!r})",
+                    line=key.line, col=key.col, filename=self.filename,
+                )
+
+            # La primera línea no vacía debe ser 'creature <nombre>'
+            if not entries and key.value != "creature":
+                raise ParseError(
+                    f"la primera línea de la cabecera debe ser 'creature <nombre>', "
+                    f"se encontró ({key.value!r})",
+                    line=key.line, col=key.col, filename=self.filename,
+                )
+
+            self.advance()
+            value = self.parse_header_value()
+            entries.append((key.value, value, key.line))
+
+            # Tras el valor solo puede venir fin de línea
+            fin = self.peek()
+            if fin.type not in (TokenType.NEWLINE, TokenType.EOF):
+                raise ParseError(
+                    f"se esperaba fin de línea, se encontró "
+                    f"{fin.type.name} ({fin.value!r})",
+                    line=fin.line, col=fin.col, filename=self.filename,
+                )
+            self.match(TokenType.NEWLINE)
+
+        return entries
+
+
     # Instrucciones: solo la asignacion por ahora (spec 2.3: name = expr)
 
 
