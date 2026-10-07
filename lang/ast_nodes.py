@@ -24,6 +24,13 @@ class Block:
 
 
 @dataclass
+class Label:
+    """name: — marca un punto al que se puede saltar. No consume turno."""
+    name: str                   # "wander", "bite", "start", ...
+    line: int = 0               # línea donde aparece la etiqueta
+
+
+@dataclass
 class IfGoto:
     """if COND goto LABEL"""
     condition: object           # nodo de expresión

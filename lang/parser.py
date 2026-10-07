@@ -1,7 +1,7 @@
 from lang.tokens import Token, TokenType
 from lang.ast_nodes import (
     SpeciesDef, Block,
-    IfGoto, Goto, Call, Assign,
+    Label, IfGoto, Goto, Call, Assign,
     Number, String, Identifier, BinaryOp, UnaryOp,
 )
 from lang.errors import ParseError
@@ -17,6 +17,15 @@ class Parser:
         self.tokens   = tokens
         self.pos      = 0
         self.filename = filename
+
+        # Despacho de líneas del cuerpo: tipo de línea -> método que la parsea
+        self._handlers = {
+            "label":  self.parse_label,
+            "assign": self.parse_assign,
+            "action": self.parse_action,
+            "goto":   self.parse_goto,
+            "if":     self.parse_if_goto,
+        }
 
 
     #manejo de la lista de tokens
@@ -158,13 +167,102 @@ class Parser:
         return entries
 
 
-    # Instrucciones: solo la asignacion por ahora (spec 2.3: name = expr)
+    # Instrucciones del cuerpo (spec 2.3): una línea = una instrucción
 
 
-    def at_assign(self):
-        """¿La línea actual es 'name = ...'? (IDENT seguido de '=')"""
-        return (self.peek().type == TokenType.IDENT
-                and self.peek(1).type == TokenType.ASSIGN)
+    def _classify(self):
+        """Tipo de la línea del cuerpo. Si no encaja en ninguna forma
+           válida, lanza ParseError. Sin efectos secundarios: no avanza."""
+        tok = self.peek()
+
+        if tok.type == TokenType.GOTO:
+            return "goto"
+        if tok.type == TokenType.IF:
+            return "if"
+        if tok.type == TokenType.IDENT:
+            # Las tres formas que empiezan con IDENT se resuelven con datos,
+            # no con ramas: COLON -> etiqueta, ASSIGN -> asignación, LPAREN -> acción
+            kind = {
+                TokenType.COLON:  "label",
+                TokenType.ASSIGN: "assign",
+                TokenType.LPAREN: "action",
+            }.get(self.peek(1).type)
+            if kind:
+                return kind
+            nxt = self.peek(1)
+            raise ParseError(
+                f"línea no válida: se esperaba ':', '=' o '(' después de "
+                f"{tok.value!r}, se encontró {nxt.type.name} ({nxt.value!r})",
+                line=nxt.line, col=nxt.col, filename=self.filename,
+            )
+        raise ParseError(
+            f"se esperaba una instrucción (etiqueta, goto, if, asignación "
+            f"o acción), se encontró {tok.type.name} ({tok.value!r})",
+            line=tok.line, col=tok.col, filename=self.filename,
+        )
+
+    def parse_statement(self):
+        """Una línea del cuerpo. Consume la línea completa, incluido su
+           NEWLINE. Devuelve Label, Goto, IfGoto, Assign o Call."""
+        node = self._handlers[self._classify()]()
+
+        # Tras la instrucción solo puede venir fin de línea
+        fin = self.peek()
+        if fin.type not in (TokenType.NEWLINE, TokenType.EOF):
+            raise ParseError(
+                f"se esperaba fin de línea, se encontró "
+                f"{fin.type.name} ({fin.value!r})",
+                line=fin.line, col=fin.col, filename=self.filename,
+            )
+        self.match(TokenType.NEWLINE)
+        return node
+
+    def parse_label(self):
+        """name: -> Label. Marca un punto de salto; no consume turno."""
+        name_tok = self.expect(TokenType.IDENT)
+        self.expect(TokenType.COLON)
+        return Label(name_tok.value, line=name_tok.line)
+
+    def parse_goto(self):
+        """goto name -> Goto. (Que la etiqueta exista: fase 3.)"""
+        gt = self.expect(TokenType.GOTO)
+        name_tok = self._expect_label_name()
+        return Goto(name_tok.value, line=gt.line)
+
+    def parse_if_goto(self):
+        """if expr goto name -> IfGoto. La expresión se detiene sola en 'goto'
+           porque es palabra reservada y ningún operador la incluye."""
+        if_tok = self.expect(TokenType.IF)
+        cond = self.parse_expression()
+        if not self.check(TokenType.GOTO):
+            tok = self.peek()
+            raise ParseError(
+                f"después de la expresión de 'if' se esperaba 'goto', "
+                f"se encontró {tok.type.name} ({tok.value!r})",
+                line=tok.line, col=tok.col, filename=self.filename,
+            )
+        self.advance()
+        name_tok = self._expect_label_name()
+        return IfGoto(cond, name_tok.value, line=if_tok.line)
+
+    def parse_action(self):
+        """action(arg, ...) sola en su línea -> Call.
+           (Que la acción exista y cuántos argumentos trae: fase 3.)"""
+        name_tok = self.expect(TokenType.IDENT)
+        self.expect(TokenType.LPAREN)
+        return self.parse_call_args(name_tok)
+
+    def _expect_label_name(self):
+        """El nombre de una etiqueta después de 'goto'."""
+        if not self.check(TokenType.IDENT):
+            tok = self.peek()
+            raise ParseError(
+                f"se esperaba el nombre de una etiqueta, "
+                f"se encontró {tok.type.name} ({tok.value!r})",
+                line=tok.line, col=tok.col, filename=self.filename,
+            )
+        return self.advance()
+
 
     def parse_assign(self):
         """name = expr -> Assign. El '=' no puede ir dentro de una expresion

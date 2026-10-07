@@ -305,6 +305,77 @@ def test_header():
     print("=== parse_header OK ===\n")
 
 
+def test_statement():
+    """parse_statement: las5 formas de línea del cuerpo (spec 2.3)."""
+    print("=== parse_statement ===")
+
+    def parse(src):
+        p = Parser(Lexer(src + "\n", "test.ins").tokenize(), "test.ins")
+        return p, p.parse_statement()
+
+    # 1. formas válidas -> nodo AST esperado
+    casos = [
+        ("wander:", "Label(name='wander', line=1)"),
+        ("start:",  "Label(name='start', line=1)"),
+        ("goto start", "Goto(label='start', line=1)"),
+        ("if health < 20 goto flee",
+         "IfGoto(condition=BinaryOp(op='<', left=Identifier(name='health', line=1), "
+         "right=Number(value=20, line=1), line=1), label='flee', line=1)"),
+        ("if see(x, y + 1) != GROUND goto wander",
+         "IfGoto(condition=BinaryOp(op='!=', left=Call(name='see', args=["
+         "Identifier(name='x', line=1), BinaryOp(op='+', "
+         "left=Identifier(name='y', line=1), right=Number(value=1, line=1), "
+         "line=1)], line=1), right=Identifier(name='GROUND', line=1), line=1), "
+         "label='wander', line=1)"),
+        ("steps = steps + 1",
+         "Assign(name='steps', expr=BinaryOp(op='+', "
+         "left=Identifier(name='steps', line=1), right=Number(value=1, line=1), "
+         "line=1), line=1)"),
+        ('say("meat is back")',
+         "Call(name='say', args=[String(value='meat is back', line=1)], line=1)"),
+        ("wait()", "Call(name='wait', args=[], line=1)"),
+        ("move(-enemy_dx, -enemy_dy, 3)",
+         "Call(name='move', args=[UnaryOp(op='-', "
+         "operand=Identifier(name='enemy_dx', line=1), line=1), "
+         "UnaryOp(op='-', operand=Identifier(name='enemy_dy', line=1), line=1), "
+         "Number(value=3, line=1)], line=1)"),
+    ]
+    for src, esperado in casos:
+        p, node = parse(src)
+        print("  %-38r -> %s" % (src, node))
+        assert str(node) == esperado, \
+            "esperado %r, obtenido %r" % (esperado, str(node))
+        # la línea se consume entera: quedamos en EOF
+        assert p.peek().type == TokenType.EOF, "no consumió el NEWLINE final"
+    print("   OK, formas válidas\n")
+
+    # 2. errores: (fuente, fragmento del mensaje)
+    casos_error = [
+        ("foo + 1",           "línea no válida"),
+        ("goto 5",            "nombre de una etiqueta"),
+        ("goto",              "nombre de una etiqueta"),
+        ("if health < 20 flee", "'goto'"),
+        ("if",                "esperaba una expresion"),
+        ("if health goto",    "nombre de una etiqueta"),
+        ("move(1, 0, 1) x",   "fin de línea"),
+        ("wander: x",         "fin de línea"),
+        ("goto start + 1",    "fin de línea"),
+        ("2 + 3",             "instrucción"),
+    ]
+    for src, esperado in casos_error:
+        print("  %-38r -> debe fallar" % src)
+        p = Parser(Lexer(src + "\n", "test.ins").tokenize(), "test.ins")
+        try:
+            p.parse_statement()
+            raise AssertionError("debio fallar: %r" % src)
+        except ParseError as e:
+            assert esperado.lower() in str(e).lower(), \
+                "esperaba %r en el mensaje, obtenido %r" % (esperado, str(e))
+            print("     OK, ParseError:", e)
+
+    print("=== parse_statement OK ===\n")
+
+
 def main():
     test_base()
     test_primary()
@@ -312,6 +383,7 @@ def main():
     test_not()
     test_precedence()
     test_header()
+    test_statement()
 
 
 if __name__ == "__main__":
