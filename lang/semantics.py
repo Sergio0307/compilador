@@ -28,6 +28,7 @@ class SemanticAnalyzer:
         """
         self.errors = []
         self._check_header(species)
+        self._check_jumps(species)
         return self.errors
 
 
@@ -77,4 +78,26 @@ class SemanticAnalyzer:
                     self.error(
                         f"'{key}' debe ser >= {spec['min']} (se encontró {value})",
                         line=line,
+                    )
+
+
+    # Punto 3: saltos a etiquetas existentes (spec 2.3 y 2.8)
+
+
+    def _check_jumps(self, species):
+        """Valida que cada goto / if...goto apunte a una etiqueta existente.
+
+        Los nodos de salto (Goto, IfGoto) son los unicos con atributo
+        `label`; Label usa `name`. Por eso basta un getattr, sin ramas por
+        tipo de nodo.
+        """
+        labels = set(species.blocks)
+        for block in species.blocks.values():
+            for instr in block.instructions:
+                destino = getattr(instr, "label", None)
+                if destino is not None and destino not in labels:
+                    self.error(
+                        f"en el bloque '{block.label}': goto a etiqueta "
+                        f"inexistente '{destino}'",
+                        line=instr.line,
                     )

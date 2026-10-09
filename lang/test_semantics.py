@@ -140,6 +140,66 @@ def test_via_compiler():
     print("=== vía compile_species OK ===\n")
 
 
+def test_goto_valido():
+    """Saltos hacia adelante y hacia atrás a etiquetas existentes -> sin errores."""
+    print("=== goto válido ===")
+    body = "start:\ngoto fin\nfin:\nwait(1)\ngoto start\n"
+    errors = analizar(build(VALID, body))
+    assert errors == [], errors
+    print("  OK, saltos válidos")
+    print("=== goto válido OK ===\n")
+
+
+def test_goto_inexistente():
+    """goto a una etiqueta que no existe -> error con línea y nombre."""
+    print("=== goto inexistente ===")
+    body = "start:\ngoto volar\n"
+    errors = analizar(build(VALID, body))
+    assert len(errors) == 1, errors
+    assert "volar" in str(errors[0]) and "inexistente" in str(errors[0])
+    assert "start" in str(errors[0])
+    assert errors[0].line == 7  # 5 líneas de cabecera + 'start:' + el goto
+    print("  OK:", errors[0])
+    print("=== goto inexistente OK ===\n")
+
+
+def test_if_goto_inexistente():
+    """if ... goto a una etiqueta que no existe -> error."""
+    print("=== if-goto inexistente ===")
+    body = "start:\nif health < 10 goto curar\n"
+    errors = analizar(build(VALID, body))
+    assert len(errors) == 1, errors
+    assert "curar" in str(errors[0]), errors
+    print("  OK:", errors[0])
+    print("=== if-goto inexistente OK ===\n")
+
+
+def test_varios_saltos_rotos():
+    """Varios saltos rotos -> se acumulan todos."""
+    print("=== varios saltos rotos ===")
+    body = "start:\ngoto a\nif x > 0 goto b\n"
+    errors = analizar(build(VALID, body))
+    assert len(errors) == 2, errors
+    texto = " ".join(str(e) for e in errors)
+    assert "'a'" in texto and "'b'" in texto, texto
+    print("  OK, 2 errores acumulados")
+    print("=== varios saltos rotos OK ===\n")
+
+
+def test_saltos_via_compiler():
+    """compile_species junta un fallo de cabecera y un goto roto."""
+    print("=== saltos vía compile_species ===")
+    header = ["creature X", "faction f", "health 10", "vision 1"]  # falta lifespan
+    src = build(header, "start:\ngoto nope\n")
+    try:
+        compile_species(src, "x.ins")
+        raise AssertionError("debía lanzar SemanticErrors")
+    except SemanticErrors as e:
+        assert len(e.errors) == 2, e.errors
+        print(str(e))
+    print("=== saltos vía compile_species OK ===\n")
+
+
 def main():
     test_cabecera_valida()
     test_faltante_una()
@@ -151,7 +211,12 @@ def main():
     test_numero_esperado()
     test_string_comillas()
     test_via_compiler()
-    print("TODOS LOS TESTS DE SEMÁNTICA (CABECERA) OK")
+    test_goto_valido()
+    test_goto_inexistente()
+    test_if_goto_inexistente()
+    test_varios_saltos_rotos()
+    test_saltos_via_compiler()
+    print("TODOS LOS TESTS DE SEMÁNTICA OK")
 
 
 if __name__ == "__main__":
