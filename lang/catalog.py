@@ -2,9 +2,10 @@
 
 Reúne en estructuras de datos todos los nombres que un archivo .ins puede
 usar: las siete acciones básicas con su aridad, las funciones reservadas
-see/name, las cinco constantes que devuelve see() y todas las percepciones.
-Así el analizador semántico y el intérprete resuelven un nombre con una
-consulta a un diccionario, sin cadenas de ifs (sección 5 de la spec).
+see/name, las cinco constantes que devuelve see(), todas las percepciones
+y las claves de la cabecera. Así el analizador semántico y el intérprete
+resuelven un nombre con una consulta a un diccionario, sin cadenas de ifs
+(sección 5 de la spec).
 """
 
 # Acciones básicas: nombre -> número de argumentos (spec 2.4).
@@ -60,3 +61,13 @@ PERCEPTIONS = PERCEPTIONS_SELF | PERCEPTIONS_WORLD | PERCEPTIONS_NEAR
 
 # Nombres a los que NO se puede asignar: percepciones y constantes (spec 2.3).
 READONLY = PERCEPTIONS | set(CONSTANTS)
+
+# Claves de la cabecera (spec 2.2): las cinco obligatorias, con qué espera
+# cada una. "name" = nombre, "int" = entero con valor mínimo.
+HEADER_KEYS = {
+    "creature": {"kind": "name"},
+    "faction":  {"kind": "name"},
+    "health":   {"kind": "int", "min": 1},   # health > 0
+    "vision":   {"kind": "int", "min": 1},   # vision >= 1
+    "lifespan": {"kind": "int", "min": 1},   # lifespan > 0
+}
