@@ -6,7 +6,8 @@ el AST y acumulamos TODOS los errores en una lista, para reportarlos juntos.
 """
 
 from lang.errors import SemanticError
-from lang.catalog import HEADER_KEYS
+from lang.catalog import HEADER_KEYS, CONSTANTS, READONLY
+from lang.ast_nodes import Assign
 
 
 class SemanticAnalyzer:
@@ -29,6 +30,7 @@ class SemanticAnalyzer:
         self.errors = []
         self._check_header(species)
         self._check_jumps(species)
+        self._check_assignments(species)
         return self.errors
 
 
@@ -99,5 +101,25 @@ class SemanticAnalyzer:
                     self.error(
                         f"en el bloque '{block.label}': goto a etiqueta "
                         f"inexistente '{destino}'",
+                        line=instr.line,
+                    )
+
+
+    # Punto 4: no se puede asignar a una percepción ni a una constante (spec 2.3)
+
+
+    def _check_assignments(self, species):
+        """Rechaza asignaciones cuyo destino sea de solo lectura (READONLY).
+
+        Solo acepta asignar a variables propias: crear una variable nueva
+        (que no existía) está permitido; lo prohibido es pisar una
+        percepción o una constante.
+        """
+        for block in species.blocks.values():
+            for instr in block.instructions:
+                if isinstance(instr, Assign) and instr.name in READONLY:
+                    tipo = "constante" if instr.name in CONSTANTS else "percepción"
+                    self.error(
+                        f"no se puede asignar a la {tipo} '{instr.name}'",
                         line=instr.line,
                     )

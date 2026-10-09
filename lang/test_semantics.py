@@ -200,6 +200,73 @@ def test_saltos_via_compiler():
     print("=== saltos vía compile_species OK ===\n")
 
 
+def test_asignacion_variable():
+    """Asignar a una variable propia (nueva) está permitido."""
+    print("=== asignación a variable ===")
+    body = "start:\nhome_x = 5\ngoto start\n"
+    errors = analizar(build(VALID, body))
+    assert errors == [], errors
+    print("  OK, variable propia permitida")
+    print("=== asignación a variable OK ===\n")
+
+
+def test_asignacion_percepcion():
+    """Asignar a una percepción -> error."""
+    print("=== asignación a percepción ===")
+    body = "start:\nhealth = 5\n"
+    errors = analizar(build(VALID, body))
+    assert len(errors) == 1, errors
+    assert "percepción" in str(errors[0]) and "health" in str(errors[0])
+    assert errors[0].line == 7  # 5 de cabecera + 'start:' + la asignación
+    print("  OK:", errors[0])
+    print("=== asignación a percepción OK ===\n")
+
+
+def test_asignacion_constante():
+    """Asignar a una constante -> error."""
+    print("=== asignación a constante ===")
+    body = "start:\nGROUND = 1\n"
+    errors = analizar(build(VALID, body))
+    assert len(errors) == 1, errors
+    assert "constante" in str(errors[0]) and "GROUND" in str(errors[0])
+    print("  OK:", errors[0])
+    print("=== asignación a constante OK ===\n")
+
+
+def test_asignaciones_acumuladas():
+    """Varias asignaciones prohibidas -> se acumulan."""
+    print("=== asignaciones acumuladas ===")
+    body = "start:\nhealth = 5\nenemy_dist = 0\nGROUND = 1\n"
+    errors = analizar(build(VALID, body))
+    assert len(errors) == 3, errors
+    print("  OK, 3 errores acumulados")
+    print("=== asignaciones acumuladas OK ===\n")
+
+
+def test_asignacion_accion_permitida():
+    """La spec solo prohíbe percepciones y constantes: 'move = 5' se permite."""
+    print("=== asignación a nombre de acción ===")
+    body = "start:\nmove = 5\n"
+    errors = analizar(build(VALID, body))
+    assert errors == [], errors
+    print("  OK, permitido (fiel a la spec)")
+    print("=== asignación a nombre de acción OK ===\n")
+
+
+def test_asignacion_via_compiler():
+    """compile_species junta un fallo de cabecera y una asignación prohibida."""
+    print("=== asignación vía compile_species ===")
+    header = ["creature X", "faction f", "health 10", "vision 1"]  # falta lifespan
+    src = build(header, "start:\nhealth = 3\n")
+    try:
+        compile_species(src, "x.ins")
+        raise AssertionError("debía lanzar SemanticErrors")
+    except SemanticErrors as e:
+        assert len(e.errors) == 2, e.errors
+        print(str(e))
+    print("=== asignación vía compile_species OK ===\n")
+
+
 def main():
     test_cabecera_valida()
     test_faltante_una()
@@ -216,6 +283,12 @@ def main():
     test_if_goto_inexistente()
     test_varios_saltos_rotos()
     test_saltos_via_compiler()
+    test_asignacion_variable()
+    test_asignacion_percepcion()
+    test_asignacion_constante()
+    test_asignaciones_acumuladas()
+    test_asignacion_accion_permitida()
+    test_asignacion_via_compiler()
     print("TODOS LOS TESTS DE SEMÁNTICA OK")
 
 
