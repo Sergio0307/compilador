@@ -267,6 +267,106 @@ def test_asignacion_via_compiler():
     print("=== asignación vía compile_species OK ===\n")
 
 
+def test_llamadas_validas():
+    """Acciones y funciones correctas -> 0 errores."""
+    print("=== llamadas válidas ===")
+    body = ('start:\n'
+            'move(1, 0, 1)\n'
+            'say("hi")\n'
+            'wait(1)\n'
+            'if see(x + 1, y) == GROUND goto start\n')
+    errors = analizar(build(VALID, body))
+    assert errors == [], errors
+    print("  OK, acciones y funciones válidas")
+    print("=== llamadas válidas OK ===\n")
+
+
+def test_accion_desconocida():
+    """Acción que no existe -> error."""
+    print("=== acción desconocida ===")
+    errors = analizar(build(VALID, "start:\nvolar(1)\n"))
+    assert len(errors) == 1, errors
+    assert "desconocida" in str(errors[0]) and "volar" in str(errors[0])
+    assert errors[0].line == 7  # 5 de cabecera + 'start:' + la acción
+    print("  OK:", errors[0])
+    print("=== acción desconocida OK ===\n")
+
+
+def test_aridad_accion():
+    """Acción con aridad distinta -> error."""
+    print("=== aridad de acción ===")
+    errors = analizar(build(VALID, "start:\nmove(1, 2)\n"))
+    assert len(errors) == 1, errors
+    assert "move" in str(errors[0]) and "3" in str(errors[0]) and "2" in str(errors[0])
+    print("  OK:", errors[0])
+    print("=== aridad de acción OK ===\n")
+
+
+def test_funcion_desconocida():
+    """Función que no existe dentro de una expresión -> error."""
+    print("=== función desconocida ===")
+    errors = analizar(build(VALID, "start:\nif foo(1) goto start\n"))
+    assert len(errors) == 1, errors
+    assert "desconocida" in str(errors[0]) and "foo" in str(errors[0])
+    print("  OK:", errors[0])
+    print("=== función desconocida OK ===\n")
+
+
+def test_aridad_funcion():
+    """Función con aridad distinta -> error."""
+    print("=== aridad de función ===")
+    errors = analizar(build(VALID, "start:\nif see(1) goto start\n"))
+    assert len(errors) == 1, errors
+    assert "see" in str(errors[0]) and "2" in str(errors[0]) and "1" in str(errors[0])
+    print("  OK:", errors[0])
+    print("=== aridad de función OK ===\n")
+
+
+def test_cruce_categorias():
+    """Mensajes cruzados cuando se usa una función como acción o viceversa."""
+    print("=== cruce de categorías ===")
+    errors = analizar(build(VALID, "start:\nsee(1, 2)\n"))
+    assert len(errors) == 1 and "función" in str(errors[0]), errors
+    print("  OK:", errors[0])
+
+    errors = analizar(build(VALID, "start:\nif move(1, 2, 3) goto start\n"))
+    assert len(errors) == 1 and "acción" in str(errors[0]), errors
+    print("  OK:", errors[0])
+    print("=== cruce de categorías OK ===\n")
+
+
+def test_recursion_args():
+    """Una función anidada en los argumentos de una acción se valida."""
+    print("=== recursión en argumentos ===")
+    errors = analizar(build(VALID, "start:\nmove(see(x, y), 0, 1)\n"))
+    assert errors == [], errors
+    print("  OK, see() dentro de move() validada")
+    print("=== recursión en argumentos OK ===\n")
+
+
+def test_llamadas_acumuladas():
+    """Varios fallos de llamadas -> se acumulan."""
+    print("=== llamadas acumuladas ===")
+    errors = analizar(build(VALID, "start:\nvolar(1)\nmove(1, 2)\n"))
+    assert len(errors) == 2, errors
+    print("  OK, 2 errores acumulados")
+    print("=== llamadas acumuladas OK ===\n")
+
+
+def test_llamadas_via_compiler():
+    """compile_species junta fallos de cabecera y de llamadas."""
+    print("=== llamadas vía compile_species ===")
+    header = ["creature X", "faction f", "health 10", "vision 1"]  # falta lifespan
+    src = build(header, "start:\nvolar(1)\n")
+    try:
+        compile_species(src, "x.ins")
+        raise AssertionError("debía lanzar SemanticErrors")
+    except SemanticErrors as e:
+        assert len(e.errors) == 2, e.errors
+        print(str(e))
+    print("=== llamadas vía compile_species OK ===\n")
+
+
 def main():
     test_cabecera_valida()
     test_faltante_una()
@@ -289,6 +389,15 @@ def main():
     test_asignaciones_acumuladas()
     test_asignacion_accion_permitida()
     test_asignacion_via_compiler()
+    test_llamadas_validas()
+    test_accion_desconocida()
+    test_aridad_accion()
+    test_funcion_desconocida()
+    test_aridad_funcion()
+    test_cruce_categorias()
+    test_recursion_args()
+    test_llamadas_acumuladas()
+    test_llamadas_via_compiler()
     print("TODOS LOS TESTS DE SEMÁNTICA OK")
 
 

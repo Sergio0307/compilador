@@ -6,8 +6,8 @@ el AST y acumulamos TODOS los errores en una lista, para reportarlos juntos.
 """
 
 from lang.errors import SemanticError
-from lang.catalog import HEADER_KEYS, CONSTANTS, READONLY
-from lang.ast_nodes import Assign
+from lang.catalog import HEADER_KEYS, CONSTANTS, READONLY, ACTIONS, FUNCTIONS
+from lang.ast_nodes import Assign, Call, IfGoto, BinaryOp, UnaryOp
 
 
 class SemanticAnalyzer:
@@ -31,6 +31,7 @@ class SemanticAnalyzer:
         self._check_header(species)
         self._check_jumps(species)
         self._check_assignments(species)
+        self._check_calls(species)
         return self.errors
 
 
@@ -123,3 +124,74 @@ class SemanticAnalyzer:
                         f"no se puede asignar a la {tipo} '{instr.name}'",
                         line=instr.line,
                     )
+
+
+    # Acciones y funciones: nombre y aridad (spec 2.8)
+
+
+    def _check_calls(self, species):
+        """Valida las llamadas del catálogo.
+
+        Un nodo Call aparece en dos sitios: como instrucción (una acción
+        sola en su línea) o anidado en una expresión (una función). Se
+        distinguen por su posición, no por su forma.
+        """
+        for block in species.blocks.values():
+            for instr in block.instructions:
+                if isinstance(instr, Call):
+                    self._check_action(instr)
+                    for arg in instr.args:
+                        self._check_expr(arg)
+                elif isinstance(instr, IfGoto):
+                    self._check_expr(instr.condition)
+                elif isinstance(instr, Assign):
+                    self._check_expr(instr.expr)
+
+    def _check_expr(self, node):
+        """Recorre una expresión buscando llamadas a función."""
+        if isinstance(node, Call):
+            self._check_function(node)
+            for arg in node.args:
+                self._check_expr(arg)
+        elif isinstance(node, BinaryOp):
+            self._check_expr(node.left)
+            self._check_expr(node.right)
+        elif isinstance(node, UnaryOp):
+            self._check_expr(node.operand)
+
+    def _check_action(self, call):
+        """Una acción debe existir en ACTIONS y traer su aridad exacta."""
+        if call.name in ACTIONS:
+            esperados = ACTIONS[call.name]
+            if len(call.args) != esperados:
+                self.error(
+                    f"la acción '{call.name}' espera {esperados} argumentos, "
+                    f"se encontraron {len(call.args)}",
+                    line=call.line,
+                )
+        elif call.name in FUNCTIONS:
+            self.error(
+                f"'{call.name}' es una función: no se puede usar como instrucción",
+                line=call.line,
+            )
+        else:
+            self.error(f"acción desconocida '{call.name}'", line=call.line)
+
+    def _check_function(self, call):
+        """Una función debe existir en FUNCTIONS y traer su aridad exacta."""
+        if call.name in FUNCTIONS:
+            esperados = FUNCTIONS[call.name]
+            if len(call.args) != esperados:
+                self.error(
+                    f"la función '{call.name}' espera {esperados} argumentos, "
+                    f"se encontraron {len(call.args)}",
+                    line=call.line,
+                )
+        elif call.name in ACTIONS:
+            self.error(
+                f"'{call.name}' es una acción: no se puede llamar dentro de "
+                f"una expresión",
+                line=call.line,
+            )
+        else:
+            self.error(f"función desconocida '{call.name}'", line=call.line)
