@@ -53,6 +53,17 @@ class Call:
     args: list                  # [expr, expr, ...]
     line: int = 0
 
+    def evaluate(self, ctx):
+        """Dentro de una expresión, un Call es una función reservada
+        (see, name, ...): el contexto evalúa los argumentos y la resuelve.
+        Como instrucción, en cambio, el intérprete la trata como acción y
+        usa sus `args` sin pasar por aquí."""
+        return ctx.call_function(
+            self.name,
+            [arg.evaluate(ctx) for arg in self.args],
+            self.line,
+        )
+
 
 @dataclass
 class Assign:
@@ -72,6 +83,10 @@ class Number:
     value: int
     line: int = 0               # línea donde aparece el literal
 
+    def evaluate(self, ctx):
+        """Un literal entero se evalúa a sí mismo."""
+        return self.value
+
 
 @dataclass
 class String:
@@ -79,12 +94,20 @@ class String:
     value: str
     line: int = 0               # línea donde aparece el literal
 
+    def evaluate(self, ctx):
+        """Un literal de texto se evalúa a sí mismo."""
+        return self.value
+
 
 @dataclass
 class Identifier:
     """health, enemy_dist, GROUND, random, start..."""
     name: str
     line: int = 0               # línea donde aparece el identificador
+
+    def evaluate(self, ctx):
+        """Variable propia, percepción o constante: lo resuelve el contexto."""
+        return ctx.resolve(self.name, self.line)
 
 
 @dataclass
@@ -95,6 +118,15 @@ class BinaryOp:
     right: object               # nodo de expresión
     line: int = 0               # línea del operador
 
+    def evaluate(self, ctx):
+        """Evalúa ambos lados y aplica el operador (reglas en values.py)."""
+        return ctx.binary(
+            self.op,
+            self.left.evaluate(ctx),
+            self.right.evaluate(ctx),
+            self.line,
+        )
+
 
 @dataclass
 class UnaryOp:
@@ -102,5 +134,9 @@ class UnaryOp:
     op: str                     # "-", "not"
     operand: object             # nodo de expresión
     line: int = 0               # línea del operador
+
+    def evaluate(self, ctx):
+        """Evalúa el operando y aplica el operador unario."""
+        return ctx.unary(self.op, self.operand.evaluate(ctx), self.line)
 
 
