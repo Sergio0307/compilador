@@ -28,6 +28,16 @@ class SemanticError(InstinctError):
     pass
 
 
+class RuntimeFault(InstinctError):
+    """Error en tiempo de ejecución (spec 2.8): el bicho muere de un ictus.
+
+    Se llama RuntimeFault y no RuntimeError para no pisar el builtin. Lo
+    lanza el intérprete (expresiones y acciones); el simulador lo captura,
+    mata a la criatura y escribe el mensaje en los logs.
+    """
+    pass
+
+
 class SemanticErrors(InstinctError):
     """Varios SemanticError agrupados para reportarlos todos juntos.
 
