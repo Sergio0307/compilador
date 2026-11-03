@@ -73,8 +73,9 @@ def main(argv=None):
     vivos = [c for c in world.creatures if c.alive]
     print(f"\n=== fin en tick {world.tick}: {len(vivos)} vivas ===")
     for c in vivos:
-        print(f"  {c.species} ({c.faction}) hp {c.health}/{c.max_health} "
-              f"edad {c.age}/{c.lifespan} en ({c.x}, {c.y})")
+        print(f"  {c.species} ({c.faction}) hp {c.health} "
+              f"(inicial {c.max_health}) edad {c.age}/{c.lifespan} "
+              f"en ({c.x}, {c.y})")
     for c in world.creatures:
         if not c.alive:
             print(f"  {c.species} murió: {c.death_reason}")

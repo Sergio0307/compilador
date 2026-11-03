@@ -1,3 +1,10 @@
+# Entorno virtual
+.venv/
+
+# Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+
+# Editor
+.vscode/
+.idea/

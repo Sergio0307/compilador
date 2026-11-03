@@ -12,19 +12,19 @@ RuntimeFault (el bicho muere de un ictus y queda en el log).
 
 Reglas fijadas en el diseño:
  - radio de visión cuadrado de Chebyshev, sin línea de visión;
- - roars_near = rugidos de los últimos 3 ticks dentro del radio;
- - reproduce sin coste para el padre; reserve_here es informativa;
- - orden de turno = orden de creación; age +1 al final de su turno.
+ - "roars_near" = rugidos del tick anterior dentro del radio;
+ - "reproduce" gasta vida a la madre y la cría nace sin tope;
+ - orden de turno = sorteo al azar en cada tick;
+ - leyes naturales al cierre del tick: vida -1, edad +1, verificar muertes.
 """
 
 import random
 
 from lang.catalog import CONSTANTS
 from lang.errors import RuntimeFault
-from lang.interpreter import Interpreter, Program, CreatureExecution
-
+from lang.interpreter import CreatureExecution, Interpreter, Program
 from world.creature import Creature
-from world.terrain import Terrain, ROCK
+from world.terrain import ROCK, Terrain
 
 
 def _sign(value):
@@ -36,12 +36,12 @@ class World:
     def __init__(self, width=40, height=20, seed=None):
         self.terrain = Terrain(width, height)
         self.tick = 0
-        self.creatures = []        # orden de creación = orden de turno
-        self.roars = []            # [(tick, x, y, value), ...]
-        self.log = []              # eventos: (tipo, tick, nombre, valor)
+        self.creatures = []  # orden de creación = orden de turno
+        self.roars = []  # [(tick, x, y, value), ...]
+        self.log = []  # eventos: (tipo, tick, nombre, valor)
         self.interpreter = Interpreter()
         self.random = random.Random(seed)
-        self._programs = {}        # id(SpeciesDef) -> Program (compartido)
+        self._programs = {}  # id(SpeciesDef) -> Program (compartido)
 
     # ------------------------------------------------------------------
     # Población
@@ -59,7 +59,8 @@ class World:
         creature = Creature(
             species_def,
             CreatureExecution(self._program_of(species_def)),
-            x, y,
+            x,
+            y,
         )
         self.creatures.append(creature)
         return creature
@@ -90,29 +91,40 @@ class World:
     # ------------------------------------------------------------------
 
     def run_round(self):
-        """Una ronda: cada criatura viva hace su turno, en orden de creación.
+        """Una ronda: cada criatura viva hace su turno, en orden sorteado
+        en cada tick
 
-        Al cerrar la ronda avancen el tick y caducan los rugidos viejos.
-        Devuelve la lista de vivas.
+        Las crías nacidas durante la ronda no entran: su primer turno es
+        el tick siguiente . Al cierre se aplican las leyes
+        naturales y caducan los rugidos viejos.
         """
-        for creature in list(self.creatures):   # copia: reproduce añade
-            if not creature.alive:
-                continue
+        order = [c for c in self.creatures if c.alive]
+        self.random.shuffle(order)
+        for creature in order:
             try:
                 self.interpreter.run_turn(creature, self)
             except RuntimeFault as fault:
                 self.kill(creature, f"ictus: {fault.message}")
-            if creature.alive:
-                creature.age += 1
-                if creature.age >= creature.lifespan:
-                    self.kill(creature, "vejez")
-        self.tick += 1
-        self.roars = [r for r in self.roars if r[0] >= self.tick - 2]
+        self._end_of_tick()
         return [c for c in self.creatures if c.alive]
 
-    # ------------------------------------------------------------------
-    # Percepciones (spec 2.7.2)
-    # ------------------------------------------------------------------
+    def _end_of_tick(self):
+        """Leyes naturales al final de cada tick: toda criatura
+        viva pierde 1 de vida y suma 1 de edad; muere quien llegue a 0 de
+        vida o alcance su lifespan."""
+        for creature in self.creatures:
+            if not creature.alive:
+                continue
+            creature.health -= 1
+            creature.age += 1
+            if creature.health <= 0:
+                creature.health = 0
+                self.kill(creature, "hambre")
+            elif creature.age >= creature.lifespan:
+                self.kill(creature, "vejez")
+        self.tick += 1
+        # El rugido del tick que acaba se oye durante el próximo (spec 2.6)
+        self.roars = [r for r in self.roars if r[0] >= self.tick - 1]
 
     @staticmethod
     def _distance(x1, y1, x2, y2):
@@ -124,8 +136,10 @@ class World:
 
     def _nearby_creatures(self, creature):
         return [
-            other for other in self.creatures
-            if other.alive and other is not creature
+            other
+            for other in self.creatures
+            if other.alive
+            and other is not creature
             and self._distance_to(creature, other.x, other.y) <= creature.vision
         ]
 
@@ -155,14 +169,17 @@ class World:
         rocks = self._rocks_in_vision(creature)
 
         enemy_dist, enemy_dx, enemy_dy = self._nearest(
-            creature, [(c.x, c.y) for c in enemies])
+            creature, [(c.x, c.y) for c in enemies]
+        )
         ally_dist, ally_dx, ally_dy = self._nearest(
-            creature, [(c.x, c.y) for c in allies])
+            creature, [(c.x, c.y) for c in allies]
+        )
         object_dist, object_dx, object_dy = self._nearest(creature, rocks)
 
         heard = [
-            r for r in self.roars
-            if r[0] >= self.tick - 2
+            r
+            for r in self.roars
+            if r[0] == self.tick - 1
             and self._distance_to(creature, r[1], r[2]) <= creature.vision
         ]
 
@@ -184,12 +201,15 @@ class World:
             "tick": self.tick,
             "total_creatures": sum(1 for c in self.creatures if c.alive),
             "total_allies": sum(
-                1 for c in self.creatures
-                if c.alive and c is not creature and c.faction == creature.faction),
+                1
+                for c in self.creatures
+                if c.alive and c is not creature and c.faction == creature.faction
+            ),
             "total_enemies": sum(
-                1 for c in self.creatures
-                if c.alive and c is not creature and c.faction != creature.faction),
-            "random": self.random.randint(0, 99),
+                1
+                for c in self.creatures
+                if c.alive and c is not creature and c.faction != creature.faction
+            ),
             # cerca (radio de visión)
             "allies_near": len(allies),
             "enemies_near": len(enemies),
@@ -209,6 +229,9 @@ class World:
 
     def perception(self, creature, name):
         """Valor del snapshot hecho al empezar el turno."""
+
+        if name == "random":
+            return self.random.randint(0, 99)
         return creature.perceptions.get(name, 0)
 
     # ------------------------------------------------------------------
@@ -219,10 +242,15 @@ class World:
         """NONE si no se ve; si no, ALLY/ENEMY > OBJECT > GROUND."""
         if self._distance_to(creature, x, y) > creature.vision:
             return CONSTANTS["NONE"]
+        if x == creature.x and y == creature.y:
+            return CONSTANTS["ALLY"]
         other = self.creature_at(x, y)
-        if other is not None and other is not creature:
-            return CONSTANTS["ALLY"] if other.faction == creature.faction \
+        if other is not None:
+            return (
+                CONSTANTS["ALLY"]
+                if other.faction == creature.faction
                 else CONSTANTS["ENEMY"]
+            )
         if self.terrain.terrain_at(x, y) == ROCK:
             return CONSTANTS["OBJECT"]
         return CONSTANTS["GROUND"]
@@ -232,15 +260,13 @@ class World:
         if self._distance_to(creature, x, y) > creature.vision:
             return ""
         other = self.creature_at(x, y)
-        if other is not None and other is not creature:
+        if other is not None:
             return other.species
         if self.terrain.terrain_at(x, y) == ROCK:
             return "Rock"
         return ""
 
-    # ------------------------------------------------------------------
-    # Acciones (lang/actions.py llama a esto)
-    # ------------------------------------------------------------------
+    # ACTIONS
 
     def move(self, creature, dx, dy, speed):
         """Avanza hasta `speed` casillas; se para ante roca, borde o bicho."""
@@ -253,11 +279,17 @@ class World:
             creature.x, creature.y = nx, ny
 
     def _hurt(self, creature, dx, dy, damage, kind):
-        """Daña a quien haya en la casilla relativa; (0,0) es la propia."""
+        """Daña a quien haya en la casilla relativa. (0,0) golpea el
+        terreno bajo la propia criatura."""
+        if dx == 0 and dy == 0:
+            # El objetivo es el terreno bajo la criatura: su reserva baja.
+            # (Las reservas de terreno/objetos llegan con ese modelo; por
+            # ahora un golpe al suelo no tiene efecto que registrar.)
+            return
         target = self.creature_at(creature.x + dx, creature.y + dy)
         if target is None:
-            return                      # golpe al aire
-        target.health = min(target.max_health, target.health - damage)
+            return  # golpe al aire (violinazo)
+        target.health -= damage
         if target.health <= 0:
             target.health = 0
             self.kill(target, f"{kind} de {creature.species}")
@@ -266,28 +298,37 @@ class World:
         self._hurt(creature, dx, dy, damage, "ataque")
 
     def consume(self, creature, dx, dy, damage, heal):
-        """Como attack y además el atacante gana `heal` de vida (clamp)."""
+        """Como attack y además el atacante gana `heal` de vida, básicamente se cura"""
         self._hurt(creature, dx, dy, damage, "consume")
         if not creature.alive:
             return
-        creature.health = max(
-            0, min(creature.max_health, creature.health + heal))
-        if creature.health == 0:
+        creature.health += heal
+        if creature.health <= 0:
+            creature.health = 0
             self.kill(creature, "consume con cura no positiva")
 
     def reproduce(self, creature, dx, dy, health):
-        """Cría en la casilla adyacente si está libre; sin coste al padre."""
+        """Cría en la casilla adyacente si la madre tiene vida de sobra:
+        la madre gasta `health` puntos y la cría nace con
+        exactamente esa vida, edad 0, sin variables y en 'start'."""
         nx, ny = creature.x + dx, creature.y + dy
         if not self.terrain.is_walkable(nx, ny):
-            return
+            return  # aborto natural: no hay casilla
         if self.creature_at(nx, ny) is not None:
-            return
+            return  # aborto natural: casilla ocupada
+        if creature.health <= health:
+            return  # aborto natural: sin vida de sobra
         child = self.add_creature(creature.species_def, nx, ny)
-        child.health = max(1, min(creature.max_health, health))
+        child.health = health
+        creature.health -= health
+        if creature.health <= 0:
+            creature.health = 0
+            self.kill(creature, "parto")
         self.log.append(("nacimiento", self.tick, child.species, (nx, ny)))
 
     def roar(self, creature, value):
-        """Registra el rugido: lo oyen quienes están en su radio de visión."""
+        """Registra el rugido: en el tick siguiente y lo oyen quienes estén
+        en su radio de visión."""
         self.roars.append((self.tick, creature.x, creature.y, value))
         self.log.append(("rugido", self.tick, creature.species, value))
 

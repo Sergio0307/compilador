@@ -168,14 +168,20 @@ def test_presupuesto_100():
     print("=== tope de 100 líneas OK ===\n")
 
 
-def test_wrap_mismo_turno():
-    """Al llegar al final del archivo vuelve a start en el MISMO turno."""
-    print("=== wrap en el mismo turno ===")
-    _, _, world = run_turns('say("a")\n')
-    says = sum(1 for c in world.calls if c == ("say", "a"))
-    assert says == 100, says
-    print(f"  OK, envolvió a start y ejecutó hasta el tope ({says} says)")
-    print("=== wrap en el mismo turno OK ===\n")
+def test_wrap_proximo_turno():
+    """Al llegar al final del archivo retoma en 'start:' EN EL PRÓXIMO
+    turno (spec 2.7.6), no dentro del mismo."""
+    print("=== wrap al próximo turno ===")
+    creature, execution = make_creature('say("a")\n')
+    world = FakeWorld()
+    interp = Interpreter()
+    interp.run_turn(creature, world)
+    assert world.calls == [("say", "a")], world.calls
+    assert execution.pc == 0, execution.pc          # quedó en start
+    interp.run_turn(creature, world)
+    assert world.calls == [("say", "a"), ("say", "a")], world.calls
+    print("  OK, un say por turno; en el 2º retomó desde start")
+    print("=== wrap al próximo turno OK ===\n")
 
 
 def test_memoria_entre_turnos():
@@ -322,7 +328,7 @@ def main():
     test_say_no_consume()
     test_wait()
     test_presupuesto_100()
-    test_wrap_mismo_turno()
+    test_wrap_proximo_turno()
     test_memoria_entre_turnos()
     test_see_constantes()
     test_name_funcion()

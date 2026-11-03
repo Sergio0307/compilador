@@ -1,16 +1,20 @@
 # world/test_world.py
 """Tests del simulador: terreno, acciones, percepciones y rondas."""
 
-from lang.compiler import compile_species
 from lang.catalog import CONSTANTS
-
+from lang.compiler import compile_species
 from world.world import World
 
 
 def compilar(body="", **cabecera):
     """Compila un .ins de prueba con cabecera por defecto (fusiona kwargs)."""
-    cab = {"creature": "Uruk", "faction": "isengard", "health": 10,
-           "vision": 3, "lifespan": 100}
+    cab = {
+        "creature": "Uruk",
+        "faction": "isengard",
+        "health": 10,
+        "vision": 3,
+        "lifespan": 100,
+    }
     cab.update(cabecera)
     src = "".join(f"{k} {v}\n" for k, v in cab.items()) + "start:\n" + body
     return compile_species(src, "t.ins")
@@ -19,6 +23,7 @@ def compilar(body="", **cabecera):
 # --------------------------------------------------------------------------
 # Población y terreno
 # --------------------------------------------------------------------------
+
 
 def test_nacimiento():
     """add_creature y free_cells: la ocupada desaparece de las libres."""
@@ -40,12 +45,12 @@ def test_move():
     c = w.add_creature(compilar(), 5, 5)
     w.terrain.add_rock(7, 5)
     w.move(c, 1, 0, 5)
-    assert (c.x, c.y) == (6, 5), (c.x, c.y)          # roca en 7,5
+    assert (c.x, c.y) == (6, 5), (c.x, c.y)  # roca en 7,5
     w.move(c, -1, 0, 99)
-    assert (c.x, c.y) == (0, 5), (c.x, c.y)          # borde: fuera es roca
+    assert (c.x, c.y) == (0, 5), (c.x, c.y)  # borde: fuera es roca
     otra = w.add_creature(compilar(), 2, 5)
     w.move(c, 1, 0, 5)
-    assert (c.x, c.y) == (1, 5), (c.x, c.y)          # otra criatura
+    assert (c.x, c.y) == (1, 5), (c.x, c.y)  # otra criatura
     assert (otra.x, otra.y) == (2, 5)
     print("  OK, roca, borde y criatura detienen el avance")
     print("=== move OK ===\n")
@@ -54,6 +59,7 @@ def test_move():
 # --------------------------------------------------------------------------
 # Acciones de combate
 # --------------------------------------------------------------------------
+
 
 def test_attack():
     """attack daña, mata, falla al aire y en (0,0) golpea la casilla propia."""
@@ -67,16 +73,17 @@ def test_attack():
     assert not b.alive and "ataque" in b.death_reason
     assert b.health == 0
     otro = w.add_creature(compilar(), 5, 7)
-    w.attack(otro, 1, 0, 5)                          # golpe al aire
+    w.attack(otro, 1, 0, 5)  # golpe al aire
     assert otro.health == 10
-    w.attack(a, 0, 0, 3)                             # (0,0) = su casilla
-    assert a.health == 7, a.health
-    print("  OK, daña, mata, falla al aire y (0,0) es la casilla propia")
+    w.attack(a, 0, 0, 3)  # (0,0) = el terreno bajo sí
+    assert a.health == 10, a.health  # NUNCA se golpea a sí mismo
+    print("  OK, daña, mata, falla al aire y (0,0) no golpea a la criatura")
     print("=== attack OK ===\n")
 
 
 def test_consume():
-    """consume daña como attack y cura al atacante con clamp a max."""
+    """consume daña como attack y cura al atacante SIN tope (spec 2.6:
+    no hay vida máxima: se acumula tanta como se consiga)."""
     print("=== consume ===")
     w = World(10, 10)
     a = w.add_creature(compilar(), 5, 5)
@@ -84,39 +91,47 @@ def test_consume():
     a.health = 7
     w.consume(a, 1, 0, 4, 99)
     assert b.health == 6, b.health
-    assert a.health == 10, a.health                  # clamp a max_health
+    assert a.health == 106, a.health  # sin tope
     a.health = 7
-    w.consume(a, 0, 1, 5, 1)                         # golpe al aire: solo cura
+    w.consume(a, 0, 1, 5, 1)  # golpe al aire: solo cura
     assert a.health == 8, a.health
-    print("  OK, daña al objetivo y cura con clamp")
+    w.consume(a, 0, 0, 5, 3)  # (0,0): solo cura
+    assert a.health == 11, a.health
+    print("  OK, daña al objetivo y cura sin tope")
     print("=== consume OK ===\n")
 
 
 def test_reproduce():
-    """reproduce: cría con health clamp, misma especie y Program compartido."""
+    """reproduce (spec 2.4): la madre gasta `health` y debe tener vida de
+    sobra; la cría nace con esa vida exacta y su propio programa."""
     print("=== reproduce ===")
     w = World(10, 10)
     padre = w.add_creature(compilar(), 5, 5)
-    w.reproduce(padre, 1, 0, 99)
+    w.reproduce(padre, 1, 0, 99)  # aborto: sin vida de sobra
+    assert len(w.creatures) == 1, len(w.creatures)
+    assert padre.health == 10
+    w.reproduce(padre, 1, 0, 5)
     assert len(w.creatures) == 2, len(w.creatures)
     hijo = w.creature_at(6, 5)
     assert hijo is not None and hijo is not padre
-    assert hijo.health == 10                          # clamp a max_health
+    assert hijo.health == 5, hijo.health  # nace con la vida exacta
+    assert padre.health == 5, padre.health  # la madre gastó su health
     assert hijo.age == 0
     assert hijo.execution is not padre.execution
     assert hijo.execution.program is padre.execution.program  # mismo .ins
-    w.reproduce(padre, 1, 0, 5)                       # casilla ocupada
+    w.reproduce(padre, 1, 0, 3)  # casilla ocupada
     assert len(w.creatures) == 2, len(w.creatures)
     w.terrain.add_rock(5, 6)
-    w.reproduce(padre, 0, 1, 5)                       # casilla de roca
+    w.reproduce(padre, 0, 1, 3)  # casilla de roca
     assert len(w.creatures) == 2, len(w.creatures)
-    print("  OK, nace con clamp y no nace en casilla ocupada o roca")
+    print("  OK, gasta vida, nace sin clamp y no nace en casilla ocupada o roca")
     print("=== reproduce OK ===\n")
 
 
 # --------------------------------------------------------------------------
 # Rondas: edad, vejez, ictus
 # --------------------------------------------------------------------------
+
 
 def test_vejez():
     """age +1 por ronda; al llegar a lifespan muere de vejez."""
@@ -130,6 +145,21 @@ def test_vejez():
     assert c.age == 2, c.age
     print("  OK, vive lifespan rondas y muere de vejez")
     print("=== vejez OK ===\n")
+
+
+def test_hambre():
+    """Ley natural (spec 3.4): -1 de vida por tick; a 0 muere."""
+    print("=== hambre ===")
+    w = World(10, 10)
+    c = w.add_creature(compilar(health=3, lifespan=100), 5, 5)
+    w.run_round()
+    assert c.alive and c.health == 2 and c.age == 1, (c.health, c.age)
+    w.run_round()
+    assert c.alive and c.health == 1, c.health
+    w.run_round()
+    assert not c.alive and c.health == 0 and c.death_reason == "hambre"
+    print("  OK, pierde 1 de vida por tick y muere al llegar a 0")
+    print("=== hambre OK ===\n")
 
 
 def test_ictus():
@@ -157,7 +187,7 @@ def test_e2e_rondas():
     w.run_round()
     assert (c.x, c.y) == (3, 0) and not c.alive
     assert c.death_reason == "vejez"
-    assert w.run_round() == []                       # mundo vacío
+    assert w.run_round() == []  # mundo vacío
     assert w.tick == 4, w.tick
     print("  OK, caminó 3 casillas, murió de vejez y el mundo quedó vacío")
     print("=== e2e en rondas OK ===\n")
@@ -178,12 +208,13 @@ def test_log_say():
 # Percepciones
 # --------------------------------------------------------------------------
 
+
 def test_percepciones():
     """El snapshot rellena yo/mundo y se congela hasta el siguiente turno."""
     print("=== percepciones ===")
     w = World(10, 10, seed=42)
     a = w.add_creature(compilar(vision=2), 5, 5)
-    w.add_creature(compilar(), 9, 9)                              # aliada
+    w.add_creature(compilar(), 9, 9)  # aliada
     w.add_creature(compilar(creature="Orc", faction="mordor"), 6, 5)
     w.terrain.set_reserve(5, 5, 7)
     w.update_perceptions(a)
@@ -195,9 +226,12 @@ def test_percepciones():
     assert p["width"] == 10 and p["height"] == 10 and p["tick"] == 0
     assert p["total_creatures"] == 3
     assert p["total_allies"] == 1 and p["total_enemies"] == 1  # excluye a 'a'
-    assert 0 <= p["random"] <= 99, p["random"]
+    assert "random" not in p  # random NO va al snapshot
+    valores = {w.perception(a, "random") for _ in range(50)}
+    assert all(0 <= r <= 99 for r in valores), valores
+    assert len(valores) > 1, valores  # se lee de verdad cada vez
     a.health = 4
-    assert w.perception(a, "health") == 10        # congelado hasta el turno
+    assert w.perception(a, "health") == 10  # congelado hasta el turno
     print("  OK, snapshot completo y congelado")
     print("=== percepciones OK ===\n")
 
@@ -207,12 +241,12 @@ def test_near():
     print("=== percepciones cerca ===")
     w = World(10, 10)
     a = w.add_creature(compilar(vision=3), 5, 5)
-    w.add_creature(compilar(creature="Orc", faction="mordor"), 8, 5)   # dist 3
+    w.add_creature(compilar(creature="Orc", faction="mordor"), 8, 5)  # dist 3
     w.add_creature(compilar(creature="Orc2", faction="mordor"), 5, 9)  # dist 4
     w.terrain.add_rock(6, 6)
     w.update_perceptions(a)
     p = a.perceptions
-    assert p["enemies_near"] == 1, p["enemies_near"]      # el de dist 4 no cuenta
+    assert p["enemies_near"] == 1, p["enemies_near"]  # el de dist 4 no cuenta
     assert (p["enemy_dist"], p["enemy_dx"], p["enemy_dy"]) == (3, 1, 0)
     assert p["objects_near"] == 1, p["objects_near"]
     assert (p["object_dist"], p["object_dx"], p["object_dy"]) == (1, 1, 1)
@@ -234,23 +268,25 @@ def test_near():
 # see / name / roar
 # --------------------------------------------------------------------------
 
+
 def test_see_nombre():
     """see/name con coords absolutas, prioridad y el borde como roca."""
     print("=== see y name ===")
     w = World(10, 10)
     a = w.add_creature(compilar(vision=3), 5, 5)
-    w.add_creature(compilar(), 4, 5)                            # aliada
+    w.add_creature(compilar(), 4, 5)  # aliada
     w.add_creature(compilar(creature="Orc", faction="mordor"), 7, 5)
     w.terrain.add_rock(6, 7)
     assert w.see(a, 4, 5) == CONSTANTS["ALLY"]
     assert w.see(a, 7, 5) == CONSTANTS["ENEMY"]
-    assert w.see(a, 6, 7) == CONSTANTS["OBJECT"]   # Chebyshev 2 <= 3
+    assert w.see(a, 6, 7) == CONSTANTS["OBJECT"]  # Chebyshev 2 <= 3
     assert w.see(a, 5, 6) == CONSTANTS["GROUND"]
-    assert w.see(a, 5, 5) == CONSTANTS["GROUND"]   # la casilla propia: suelo
+    assert w.see(a, 5, 5) == CONSTANTS["ALLY"]  # la casilla propia: ALLY
+    assert w.name_at(a, 5, 5) == "Uruk"  # y su nombre es el suyo
     assert w.name_at(a, 7, 5) == "Orc"
     assert w.name_at(a, 6, 7) == "Rock"
     assert w.name_at(a, 5, 6) == ""
-    assert w.see(a, 5, 9) == CONSTANTS["NONE"]     # dist 4 > vision 3
+    assert w.see(a, 5, 9) == CONSTANTS["NONE"]  # dist 4 > vision 3
     assert w.name_at(a, 5, 9) == ""
     borde = w.add_creature(compilar(vision=3), 1, 5)
     assert w.see(borde, -1, 5) == CONSTANTS["OBJECT"]  # fuera = roca
@@ -260,24 +296,26 @@ def test_see_nombre():
 
 
 def test_roar():
-    """Roar lo oyen quienes están en el radio; caduca a los 3 ticks."""
+    """El rugido se oye en el TICK SIGUIENTE (spec 2.4/2.6), en el radio."""
     print("=== roar ===")
     w = World(10, 10)
     a = w.add_creature(compilar(vision=3), 5, 5)
-    oido = w.add_creature(compilar(), 7, 5)        # dist 2: oye
-    lejos = w.add_creature(compilar(), 9, 9)       # dist 4: no oye
+    oido = w.add_creature(compilar(), 7, 5)  # dist 2: oye
+    lejos = w.add_creature(compilar(), 9, 9)  # dist 4: no oye
     w.roar(a, 7)
+    w.update_perceptions(oido)
+    assert w.perception(oido, "roars_near") == 0  # el tick actual: aún no
+    w.run_round()  # suena el tick siguiente
     w.update_perceptions(oido)
     assert w.perception(oido, "roars_near") == 1
     assert w.perception(oido, "last_roar") == 7
     w.update_perceptions(lejos)
     assert w.perception(lejos, "roars_near") == 0
     assert w.perception(lejos, "last_roar") == ""
-    for _ in range(3):                             # 3 ticks: caduca
-        w.run_round()
+    w.run_round()
     w.update_perceptions(oido)
-    assert w.perception(oido, "roars_near") == 0
-    print("  OK, oído en el radio, no fuera, caduca a los 3 ticks")
+    assert w.perception(oido, "roars_near") == 0  # ya pasó su único tick
+    print("  OK, oído solo en el tick siguiente y solo dentro del radio")
     print("=== roar OK ===\n")
 
 
@@ -287,6 +325,7 @@ def main():
     test_attack()
     test_consume()
     test_reproduce()
+    test_hambre()
     test_vejez()
     test_ictus()
     test_e2e_rondas()

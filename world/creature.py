@@ -8,8 +8,8 @@ turno) y actualiza `health`, `age` y la posición cuando corre las acciones.
 
 class Creature:
     def __init__(self, species_def, execution, x, y):
-        self.species_def = species_def      # SpeciesDef: para reproducirse
-        self.species = species_def.name     # percepción 'species'
+        self.species_def = species_def  # SpeciesDef: para reproducirse
+        self.species = species_def.name  # percepción 'species'
         self.faction = species_def.faction
         self.max_health = species_def.health
         self.health = species_def.health
@@ -21,10 +21,10 @@ class Creature:
         self.execution = execution
         self.alive = True
         self.death_reason = ""
-        self.perceptions = {}               # snapshot del turno (spec 2.7.2)
+        self.perceptions = {}  # snapshot del turno
 
     def kill(self, reason):
-        """La mata (ictus, daño o vejez). Idempotente."""
+        """Mata a la criatura y dá su razón de muerte"""
         if self.alive:
             self.alive = False
             self.death_reason = reason

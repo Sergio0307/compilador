@@ -17,18 +17,19 @@ Las tres piezas:
 Nada de esto importa world/: el mundo entra por parámetro.
 """
 
-from lang.ast_nodes import Goto, IfGoto, Assign, Call
+from lang.actions import ACTION_BY_NAME
+from lang.ast_nodes import Assign, Call, Goto, IfGoto
 from lang.catalog import CONSTANTS, PERCEPTIONS
 from lang.errors import RuntimeFault
-from lang.values import binary, unary, is_truthy
-from lang.actions import ACTION_BY_NAME
+from lang.values import binary, is_truthy, unary
 
-MAX_INSTRUCTIONS = 100   # spec 2.7
+MAX_INSTRUCTIONS = 100
 
 
 # --------------------------------------------------------------------------
-# Funciones reservadas (spec 2.6)
+# Funciones reservadas
 # --------------------------------------------------------------------------
+
 
 def _require_coords(fname, x, y, line):
     """see()/name() esperan coordenadas numéricas, no texto."""
@@ -56,6 +57,7 @@ FUNCTION_BY_NAME = {"see": _see, "name": _name}
 # --------------------------------------------------------------------------
 # Programa y estado de la criatura
 # --------------------------------------------------------------------------
+
 
 class Program:
     """Instrucciones lineales de una especie y dónde caen sus etiquetas.
@@ -87,14 +89,15 @@ class CreatureExecution:
 
     def __init__(self, program, entry="start"):
         self.program = program
-        self.pc = program.labels.get(entry, 0)   # índice en instructions
-        self.variables = {}                       # memoria propia
-        self.waiting = 0                          # turnos dormidos por wait(n)
+        self.pc = program.labels.get(entry, 0)
+        self.variables = {}  # memoria propia
+        self.waiting = 0  # turnos dormidos por wait(n)
 
 
 # --------------------------------------------------------------------------
 # Contexto de evaluación: el contrato de los .evaluate y de las acciones
 # --------------------------------------------------------------------------
+
 
 class EvalContext:
     def __init__(self, creature, world, state):
@@ -110,9 +113,7 @@ class EvalContext:
             return CONSTANTS[name]
         if name in PERCEPTIONS:
             return self.world.perception(self.creature, name)
-        raise RuntimeFault(
-            f"variable '{name}' leída antes de asignarse", line=line
-        )
+        raise RuntimeFault(f"variable '{name}' leída antes de asignarse", line=line)
 
     def binary(self, op, a, b, line=None):
         return binary(op, a, b, line)
@@ -131,40 +132,44 @@ class EvalContext:
 # Intérprete
 # --------------------------------------------------------------------------
 
+
 class Interpreter:
     def __init__(self):
         self.actions = ACTION_BY_NAME
-        self._handlers = {                 # despacho por tipo, sin ifs
-            Goto:   self._do_goto,
+        self._handlers = {  # despacho por tipo, sin ifs
+            Goto: self._do_goto,
             IfGoto: self._do_if,
             Assign: self._do_assign,
-            Call:   self._do_call,
+            Call: self._do_call,
         }
 
     def run_turn(self, creature, world):
         """Ejecuta el turno actual. Puede lanzar RuntimeFault: el mundo lo
         captura, mata al bicho y lo registra."""
         state = creature.execution
-        if state.waiting > 0:              # aún dormido: se salta el turno
+        if state.waiting > 0:  # aún dormido: se salta el turno
             state.waiting -= 1
             return
-        if not state.program.instructions: # 'start:' vacío: no hay nada
+        if not state.program.instructions:  # 'start:' vacío: no hay nada
             return
+        if state.pc >= len(state.program.instructions):
+            # quedó en el fin del archivo la ronda anterior;
+            # este turno arranca desde 'start:'.
+            state.pc = state.program.labels.get("start", 0)
 
         world.update_perceptions(creature)  # spec 2.7.2: snapshot
         ctx = EvalContext(creature, world, state)
 
         for _ in range(MAX_INSTRUCTIONS):
-            instr = self._fetch(state)
+            if state.pc >= len(state.program.instructions):
+                # fin del archivo -> retoma en 'start:' en el
+                # próximo turno, el turno actual termina aquí.
+                state.pc = state.program.labels.get("start", 0)
+                break
+            instr = state.program.instructions[state.pc]
             if self._execute(instr, ctx, state):
                 return
         # Presupuesto agotado sin acción: el turno termina aquí.
-
-    def _fetch(self, state):
-        # Al llegar al final del archivo vuelve a 'start:' en el MISMO turno.
-        if state.pc >= len(state.program.instructions):
-            state.pc = state.program.labels.get("start", 0)
-        return state.program.instructions[state.pc]
 
     def _execute(self, instr, ctx, state):
         handler = self._handlers.get(type(instr))
@@ -197,9 +202,7 @@ class Interpreter:
         args = [arg.evaluate(ctx) for arg in instr.args]
         action = self.actions.get(instr.name)
         if action is None:
-            raise RuntimeFault(
-                f"acción desconocida '{instr.name}'", line=instr.line
-            )
+            raise RuntimeFault(f"acción desconocida '{instr.name}'", line=instr.line)
         consumes = action.execute(ctx, args, instr.line)
         state.pc += 1
         return consumes
