@@ -101,6 +101,8 @@ class World:
         order = [c for c in self.creatures if c.alive]
         self.random.shuffle(order)
         for creature in order:
+            if not creature.alive:
+                continue
             try:
                 self.interpreter.run_turn(creature, self)
             except RuntimeFault as fault:

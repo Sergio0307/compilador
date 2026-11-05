@@ -7,12 +7,11 @@ programados. Así se prueba el intérprete en aislamiento, sin depender de
 world/ (que aún no existe).
 """
 
-from lang.compiler import compile_species
-from lang.interpreter import Interpreter, Program, CreatureExecution
-from lang.errors import RuntimeFault
 from lang.actions import ACTION_BY_NAME
 from lang.catalog import ACTIONS, CONSTANTS
-
+from lang.compiler import compile_species
+from lang.errors import RuntimeFault
+from lang.interpreter import CreatureExecution, Interpreter, Program
 
 HEADER = ["creature X", "faction f", "health 10", "vision 3", "lifespan 100"]
 
@@ -29,11 +28,11 @@ class FakeWorld:
     nada, únicamente registra las llamadas y devuelve valores programados."""
 
     def __init__(self):
-        self.calls = []          # [accion, ...] registradas
-        self.perceptions = {}    # nombre -> valor del snapshot
-        self.see_values = {}     # (x, y) -> valor de see()
-        self.name_values = {}    # (x, y) -> texto de name()
-        self.update_count = 0    # veces que se hizo el snapshot
+        self.calls = []  # [accion, ...] registradas
+        self.perceptions = {}  # nombre -> valor del snapshot
+        self.see_values = {}  # (x, y) -> valor de see()
+        self.name_values = {}  # (x, y) -> texto de name()
+        self.update_count = 0  # veces que se hizo el snapshot
 
     def update_perceptions(self, creature):
         self.update_count += 1
@@ -106,6 +105,7 @@ def expect_fault(body, fragment):
 # Tests
 # --------------------------------------------------------------------------
 
+
 def test_registro_acciones():
     """Las 7 acciones del catálogo tienen su clase registrada."""
     print("=== registro de acciones ===")
@@ -177,7 +177,7 @@ def test_wrap_proximo_turno():
     interp = Interpreter()
     interp.run_turn(creature, world)
     assert world.calls == [("say", "a")], world.calls
-    assert execution.pc == 0, execution.pc          # quedó en start
+    assert execution.pc == 0, execution.pc  # quedó en start
     interp.run_turn(creature, world)
     assert world.calls == [("say", "a"), ("say", "a")], world.calls
     print("  OK, un say por turno; en el 2º retomó desde start")
@@ -187,13 +187,15 @@ def test_wrap_proximo_turno():
 def test_memoria_entre_turnos():
     """Las variables propias persisten: el turno 2 lee lo que dejó el 1."""
     print("=== memoria entre turnos ===")
-    body = ("count = 0\n"
-            "loop:\n"
-            "count = count + 1\n"
-            "if count < 3 goto loop\n"
-            "wait(1)\n"
-            "after:\n"
-            "say(count)\n")
+    body = (
+        "count = 0\n"
+        "loop:\n"
+        "count = count + 1\n"
+        "if count < 3 goto loop\n"
+        "wait(1)\n"
+        "after:\n"
+        "say(count)\n"
+    )
     _, execution, world = run_turns(body, turns=2)
     assert execution.variables["count"] == 3, execution.variables
     # el turno 1 espera con count=3; el 2 retoma en 'say(count)' sin resetear
@@ -253,9 +255,11 @@ def test_resto_acciones():
         "attack(1, -1, 5)\nconsume(0, 0, 3, 4)\nreproduce(-1, 0, 20)\n",
         turns=3,
     )
-    for esperado in (("attack", 1, -1, 5),
-                     ("consume", 0, 0, 3, 4),
-                     ("reproduce", -1, 0, 20)):
+    for esperado in (
+        ("attack", 1, -1, 5),
+        ("consume", 0, 0, 3, 4),
+        ("reproduce", -1, 0, 20),
+    ):
         assert esperado in world.calls, (esperado, world.calls)
     print("  OK:", [c for c in world.calls if c[0] != "see"])
     print("=== attack / consume / reproduce OK ===\n")
@@ -281,7 +285,7 @@ def test_truthiness_logica():
     assert execution.variables["flag"] == 1, execution.variables
     assert execution.variables["flag2"] == 0, execution.variables
     assert not any(c == ("say", "mal") for c in world.calls), "no saltó"
-    print("  OK, 0 or \"\" es falso, 1 and 5 es 1 y not 1 es 0")
+    print('  OK, 0 or "" es falso, 1 and 5 es 1 y not 1 es 0')
     print("=== lógica OK ===\n")
 
 
@@ -289,11 +293,11 @@ def test_errores_runtime():
     """Los errores de ejecución lanzan RuntimeFault con su fragmento."""
     print("=== errores en tiempo de ejecución ===")
     casos = [
-        ("z = 1 / 0\n",              "división por cero"),
-        ("if foo > 0 goto start\n",  "antes de asignarse"),
-        ("move(2, 0, 1)\n",          "dirección fuera de rango"),
-        ('z = 1 + "a"\n',            "'+' a número y texto"),
-        ('move("a", 0, 1)\n',        "se esperaba un número"),
+        ("z = 1 / 0\n", "división por cero"),
+        ("if foo > 0 goto start\n", "antes de asignarse"),
+        ("move(2, 0, 1)\n", "dirección fuera de rango"),
+        ('z = 1 + "a"\n', "'+' a número y texto"),
+        ('move("a", 0, 1)\n', "se esperaba un número"),
         ('if 1 == "a" goto start\n', "'==' a número y texto"),
     ]
     for body, fragment in casos:

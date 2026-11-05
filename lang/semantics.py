@@ -5,9 +5,9 @@ del lexer y el parser, que paran en el primer fallo, aquí recorremos todo
 el AST y acumulamos TODOS los errores en una lista, para reportarlos juntos.
 """
 
+from lang.ast_nodes import Assign, BinaryOp, Call, IfGoto, UnaryOp
+from lang.catalog import ACTIONS, CONSTANTS, FUNCTIONS, HEADER_KEYS, READONLY
 from lang.errors import SemanticError
-from lang.catalog import HEADER_KEYS, CONSTANTS, READONLY, ACTIONS, FUNCTIONS
-from lang.ast_nodes import Assign, Call, IfGoto, BinaryOp, UnaryOp
 
 
 class SemanticAnalyzer:
@@ -17,9 +17,7 @@ class SemanticAnalyzer:
 
     def error(self, message, line=None):
         """Registra un error semántico y sigue analizando."""
-        self.errors.append(
-            SemanticError(message, line=line, filename=self.filename)
-        )
+        self.errors.append(SemanticError(message, line=line, filename=self.filename))
 
     def analyze(self, species):
         """Valida `species` y devuelve la lista de errores (vacía si todo bien).
@@ -34,9 +32,7 @@ class SemanticAnalyzer:
         self._check_calls(species)
         return self.errors
 
-
     # Punto 2: cabecera (spec 2.2)
-
 
     @staticmethod
     def _is_number(value):
@@ -52,7 +48,7 @@ class SemanticAnalyzer:
     def _check_header(self, species):
         """Valida las cinco claves obligatorias, duplicadas, desconocidas,
         tipo (nombre/número) y rango. Acumula todos los fallos."""
-        vistos = {}   # clave -> (valor, línea)
+        vistos = {}  # clave -> (valor, línea)
         for key, value, line in species.header:
             if key not in HEADER_KEYS:
                 self.error(f"clave de cabecera desconocida '{key}'", line=line)
@@ -74,7 +70,7 @@ class SemanticAnalyzer:
             if spec["kind"] == "name":
                 if self._is_number(value):
                     self.error(f"'{key}' debe ser un nombre, no un número", line=line)
-            else:   # "int"
+            else:  # "int"
                 if not self._is_number(value):
                     self.error(f"'{key}' debe ser un número entero", line=line)
                 elif int(value) < spec["min"]:
@@ -83,9 +79,7 @@ class SemanticAnalyzer:
                         line=line,
                     )
 
-
     # Punto 3: saltos a etiquetas existentes (spec 2.3 y 2.8)
-
 
     def _check_jumps(self, species):
         """Valida que cada goto / if...goto apunte a una etiqueta existente.
@@ -105,9 +99,7 @@ class SemanticAnalyzer:
                         line=instr.line,
                     )
 
-
     # Punto 4: no se puede asignar a una percepción ni a una constante (spec 2.3)
-
 
     def _check_assignments(self, species):
         """Rechaza asignaciones cuyo destino sea de solo lectura (READONLY).
@@ -125,9 +117,7 @@ class SemanticAnalyzer:
                         line=instr.line,
                     )
 
-
     # Acciones y funciones: nombre y aridad (spec 2.8)
-
 
     def _check_calls(self, species):
         """Valida las llamadas del catálogo.

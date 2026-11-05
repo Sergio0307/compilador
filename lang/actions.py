@@ -18,9 +18,7 @@ def _require_numbers(args, line):
     """Las acciones que esperan números rechazan el texto (spec 2.5)."""
     for value in args:
         if isinstance(value, str):
-            raise RuntimeFault(
-                "se esperaba un número, se recibió texto", line=line
-            )
+            raise RuntimeFault("se esperaba un número, se recibió texto", line=line)
 
 
 def _require_directions(dx, dy, line):
@@ -64,6 +62,7 @@ class Action(ABC):
 
 class Wait(Action):
     """wait(n): no hace nada durante n turnos seguidos (n < 1 cuenta como 1)."""
+
     name = "wait"
     arity = 1
 
@@ -72,14 +71,14 @@ class Wait(Action):
 
     def apply(self, ctx, args, line):
         turns = args[0]
-        if turns < 1:
-            turns = 1
+        turns = max(turns, 1)
         # El turno actual ya es uno de los n; el resto se saltan.
         ctx.state.waiting = turns - 1
 
 
 class Move(Action):
     """move(dx, dy, speed): avanza hasta speed casillas en (dx, dy)."""
+
     name = "move"
     arity = 3
 
@@ -93,6 +92,7 @@ class Move(Action):
 
 class Attack(Action):
     """attack(dx, dy, damage): golpea la casilla adyacente (0,0 = la de abajo)."""
+
     name = "attack"
     arity = 3
 
@@ -106,6 +106,7 @@ class Attack(Action):
 
 class Consume(Action):
     """consume(dx, dy, damage, heal): como attack y además gana heal de vida."""
+
     name = "consume"
     arity = 4
 
@@ -119,6 +120,7 @@ class Consume(Action):
 
 class Reproduce(Action):
     """reproduce(dx, dy, health): crea una cría en la casilla adyacente."""
+
     name = "reproduce"
     arity = 3
 
@@ -132,6 +134,7 @@ class Reproduce(Action):
 
 class Roar(Action):
     """roar(value): emite un rugido; acepta cualquier valor."""
+
     name = "roar"
     arity = 1
 
@@ -141,6 +144,7 @@ class Roar(Action):
 
 class Say(Action):
     """say(value): muestra un texto. Única acción que NO consume turno."""
+
     name = "say"
     arity = 1
     consumes_turn = False
@@ -150,5 +154,6 @@ class Say(Action):
 
 
 # Registro para el despacho del intérprete: nombre -> instancia.
-ACTION_BY_NAME = {a.name: a for a in (Wait(), Move(), Attack(), Consume(),
-                                      Reproduce(), Roar(), Say())}
+ACTION_BY_NAME = {
+    a.name: a for a in (Wait(), Move(), Attack(), Consume(), Reproduce(), Roar(), Say())
+}
