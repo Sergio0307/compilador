@@ -3,7 +3,11 @@
 
 from lang.catalog import CONSTANTS
 from lang.compiler import compile_species
+from world.entities import ObjectType
+from world.map import WorldMap
 from world.world import World
+
+ROCK = ObjectType("Rock", "#", 100)
 
 
 def compilar(body="", **cabecera):
@@ -38,12 +42,26 @@ def test_nacimiento():
     print("=== nacimiento OK ===\n")
 
 
+def test_mundo_con_mapa():
+    """World puede construirse a partir de un WorldMap ya creado."""
+    print("=== mundo con mapa ===")
+    mapa = WorldMap.blank(4, 4)
+    w = World(mapa)
+    c = w.add_creature(compilar(), 1, 1)
+    w.update_perceptions(c)
+    assert w.width == 4 and w.height == 4
+    assert c.perceptions["width"] == 4 and c.perceptions["height"] == 4
+    assert c.perceptions["terrain_here"] == "Grass"
+    print("  OK, el mundo usa el mapa recibido")
+    print("=== mundo con mapa OK ===\n")
+
+
 def test_move():
     """move se para en roca, en el borde y contra otra criatura."""
     print("=== move ===")
     w = World(10, 10)
     c = w.add_creature(compilar(), 5, 5)
-    w.terrain.add_rock(7, 5)
+    w.add_object(ROCK, 7, 5)
     w.move(c, 1, 0, 5)
     assert (c.x, c.y) == (6, 5), (c.x, c.y)  # roca en 7,5
     w.move(c, -1, 0, 99)
@@ -77,8 +95,30 @@ def test_attack():
     assert otro.health == 10
     w.attack(a, 0, 0, 3)  # (0,0) = el terreno bajo sí
     assert a.health == 10, a.health  # NUNCA se golpea a sí mismo
+    assert w.map.terrain_at(5, 5).reserve == 97  # pero sí gasta la reserva
     print("  OK, daña, mata, falla al aire y (0,0) no golpea a la criatura")
     print("=== attack OK ===\n")
+
+
+def test_objetos_y_regen():
+    """Un objeto agotado desaparece al cerrar el tick; el terreno regenera."""
+    print("=== objetos y regeneración ===")
+    w = World(5, 5)
+    c = w.add_creature(compilar("wait(1)\n"), 1, 1)
+    obj = w.add_object(ROCK, 2, 1)
+    terreno = w.map.terrain_at(1, 1)
+
+    w.attack(c, 1, 0, 100)
+    assert obj.reserve == 0, obj.reserve
+    assert w.map.object_at(2, 1) is not None  # todavía no se retiró
+
+    terreno.damage(50)
+    w.run_round()
+
+    assert w.map.object_at(2, 1) is None  # se retiró al cerrar el tick
+    assert terreno.reserve == 52, terreno.reserve  # 50 + regen 2
+    print("  OK, objeto retirado y terreno regenerado")
+    print("=== objetos y regeneración OK ===\n")
 
 
 def test_consume():
@@ -121,7 +161,7 @@ def test_reproduce():
     assert hijo.execution.program is padre.execution.program  # mismo .ins
     w.reproduce(padre, 1, 0, 3)  # casilla ocupada
     assert len(w.creatures) == 2, len(w.creatures)
-    w.terrain.add_rock(5, 6)
+    w.add_object(ROCK, 5, 6)
     w.reproduce(padre, 0, 1, 3)  # casilla de roca
     assert len(w.creatures) == 2, len(w.creatures)
     print("  OK, gasta vida, nace sin clamp y no nace en casilla ocupada o roca")
@@ -216,15 +256,15 @@ def test_percepciones():
     a = w.add_creature(compilar(vision=2), 5, 5)
     w.add_creature(compilar(), 9, 9)  # aliada
     w.add_creature(compilar(creature="Orc", faction="mordor"), 6, 5)
-    w.terrain.set_reserve(5, 5, 7)
+    w.map.terrain_at(5, 5).damage(93)  # deja la reserva en 7
     w.update_perceptions(a)
     p = a.perceptions
     assert p["health"] == 10 and p["age"] == 0 and p["lifespan"] == 100
     assert p["species"] == "Uruk" and p["faction"] == "isengard"
     assert (p["x"], p["y"]) == (5, 5) and p["vision"] == 2
-    assert p["terrain_here"] == 0 and p["reserve_here"] == 7
+    assert p["terrain_here"] == "Grass" and p["reserve_here"] == 7
     assert p["width"] == 10 and p["height"] == 10 and p["tick"] == 0
-    assert p["total_creatures"] == 3
+    assert p["total_creatures"] == 2
     assert p["total_allies"] == 1 and p["total_enemies"] == 1  # excluye a 'a'
     assert "random" not in p  # random NO va al snapshot
     valores = {w.perception(a, "random") for _ in range(50)}
@@ -243,7 +283,7 @@ def test_near():
     a = w.add_creature(compilar(vision=3), 5, 5)
     w.add_creature(compilar(creature="Orc", faction="mordor"), 8, 5)  # dist 3
     w.add_creature(compilar(creature="Orc2", faction="mordor"), 5, 9)  # dist 4
-    w.terrain.add_rock(6, 6)
+    w.add_object(ROCK, 6, 6)
     w.update_perceptions(a)
     p = a.perceptions
     assert p["enemies_near"] == 1, p["enemies_near"]  # el de dist 4 no cuenta
@@ -264,19 +304,31 @@ def test_near():
     print("=== percepciones cerca OK ===\n")
 
 
+def test_objects_near_no_borde():
+    """El borde del mapa no cuenta como objeto cercano."""
+    print("=== objetos cerca del borde ===")
+    w = World(10, 10)
+    c = w.add_creature(compilar(vision=3), 1, 1)
+    w.update_perceptions(c)
+    assert c.perceptions["objects_near"] == 0, c.perceptions["objects_near"]
+    assert c.perceptions["object_dist"] == -1
+    print("  OK, el borde no infla objects_near")
+    print("=== objetos cerca del borde OK ===\n")
+
+
 # --------------------------------------------------------------------------
 # see / name / roar
 # --------------------------------------------------------------------------
 
 
 def test_see_nombre():
-    """see/name con coords absolutas, prioridad y el borde como roca."""
+    """see/name con coords absolutas, prioridad y el borde del mapa."""
     print("=== see y name ===")
     w = World(10, 10)
     a = w.add_creature(compilar(vision=3), 5, 5)
     w.add_creature(compilar(), 4, 5)  # aliada
     w.add_creature(compilar(creature="Orc", faction="mordor"), 7, 5)
-    w.terrain.add_rock(6, 7)
+    w.add_object(ROCK, 6, 7)
     assert w.see(a, 4, 5) == CONSTANTS["ALLY"]
     assert w.see(a, 7, 5) == CONSTANTS["ENEMY"]
     assert w.see(a, 6, 7) == CONSTANTS["OBJECT"]  # Chebyshev 2 <= 3
@@ -285,12 +337,12 @@ def test_see_nombre():
     assert w.name_at(a, 5, 5) == "Uruk"  # y su nombre es el suyo
     assert w.name_at(a, 7, 5) == "Orc"
     assert w.name_at(a, 6, 7) == "Rock"
-    assert w.name_at(a, 5, 6) == ""
+    assert w.name_at(a, 5, 6) == "Grass"
     assert w.see(a, 5, 9) == CONSTANTS["NONE"]  # dist 4 > vision 3
     assert w.name_at(a, 5, 9) == ""
     borde = w.add_creature(compilar(vision=3), 1, 5)
     assert w.see(borde, -1, 5) == CONSTANTS["OBJECT"]  # fuera = roca
-    assert w.name_at(borde, -1, 5) == "Rock"
+    assert w.name_at(borde, -1, 5) == ""
     print("  OK, ALLY/ENEMY/OBJECT/GROUND, radio y borde-roca")
     print("=== see y name OK ===\n")
 
@@ -323,6 +375,7 @@ def main():
     test_nacimiento()
     test_move()
     test_attack()
+    test_objetos_y_regen()
     test_consume()
     test_reproduce()
     test_hambre()
@@ -332,6 +385,7 @@ def main():
     test_log_say()
     test_percepciones()
     test_near()
+    test_objects_near_no_borde()
     test_see_nombre()
     test_roar()
     print("TODOS LOS TESTS DEL MUNDO OK")

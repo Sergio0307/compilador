@@ -10,21 +10,26 @@ Cumple el contrato que lang/interpreter.py y lang/actions.py ya exigen:
 El mundo no interpreta programas: llama a Interpreter.run_turn y captura
 RuntimeFault (el bicho muere de un ictus y queda en el log).
 
+El tablero (terrenos, objetos, ocupación) vive en WorldMap. World se
+encarga del bucle de turnos y de traducir las acciones a operaciones
+sobre ese tablero.
+
 Reglas fijadas en el diseño:
  - radio de visión cuadrado de Chebyshev, sin línea de visión;
  - "roars_near" = rugidos del tick anterior dentro del radio;
  - "reproduce" gasta vida a la madre y la cría nace sin tope;
  - orden de turno = sorteo al azar en cada tick;
- - leyes naturales al cierre del tick: vida -1, edad +1, verificar muertes.
+ - leyes naturales al cierre del tick: vida -1, edad +1, verificar
+   muertes, regenerar terrenos y retirar objetos agotados.
 """
 
 import random
 
-from lang.catalog import CONSTANTS
 from lang.errors import RuntimeFault
 from lang.interpreter import CreatureExecution, Interpreter, Program
 from world.creature import Creature
-from world.terrain import ROCK, Terrain
+from world.entities import WorldObject
+from world.map import WorldMap
 
 
 def _sign(value):
@@ -33,8 +38,26 @@ def _sign(value):
 
 
 class World:
-    def __init__(self, width=40, height=20, seed=None):
-        self.terrain = Terrain(width, height)
+    def __init__(self, world_map=None, height=20, seed=None):
+        """Crea un mundo.
+
+        Acepta un WorldMap ya construido:
+
+            World(map_def.build(), seed=7)
+
+        y conserva la forma antigua para tests y CLI:
+
+            World(10, 10, seed=7)
+
+        En este último caso se crea un mapa vacío de 10x10 con el terreno
+        por defecto.
+        """
+        if world_map is None:
+            world_map = WorldMap.blank(40, height)
+        elif isinstance(world_map, int):
+            world_map = WorldMap.blank(world_map, height)
+
+        self.map = world_map
         self.tick = 0
         self.creatures = []  # orden de creación = orden de turno
         self.roars = []  # [(tick, x, y, value), ...]
@@ -42,6 +65,14 @@ class World:
         self.interpreter = Interpreter()
         self.random = random.Random(seed)
         self._programs = {}  # id(SpeciesDef) -> Program (compartido)
+
+    @property
+    def width(self):
+        return self.map.width
+
+    @property
+    def height(self):
+        return self.map.height
 
     # ------------------------------------------------------------------
     # Población
@@ -62,27 +93,31 @@ class World:
             x,
             y,
         )
+        if not self.map.place_creature(creature, x, y):
+            raise ValueError(f"la casilla ({x}, {y}) no está libre")
         self.creatures.append(creature)
         return creature
 
+    def add_object(self, object_type, x, y):
+        """Coloca un objeto nuevo en (x, y). Pensado para tests y contenido."""
+        obj = WorldObject(object_type)
+        if not self.map.place_object(obj, x, y):
+            raise ValueError(f"la casilla ({x}, {y}) no está libre")
+        return obj
+
     def free_cells(self):
-        """Casillas transitables sin criatura viva."""
-        ocupadas = {(c.x, c.y) for c in self.creatures if c.alive}
-        return [
-            (x, y)
-            for y in range(self.terrain.height)
-            for x in range(self.terrain.width)
-            if self.terrain.is_walkable(x, y) and (x, y) not in ocupadas
-        ]
+        """Casillas transitables sin objeto ni criatura."""
+        return self.map.free_cells()
 
     def creature_at(self, x, y):
         """Criatura viva que ocupa (x, y), o None."""
-        for creature in self.creatures:
-            if creature.alive and creature.x == x and creature.y == y:
-                return creature
-        return None
+        return self.map.creature_at(x, y)
 
     def kill(self, creature, reason):
+        """Saca a la criatura del tablero y registra la muerte."""
+        if not creature.alive:
+            return
+        self.map.remove_creature(creature)
         creature.kill(reason)
         self.log.append(("muerte", self.tick, creature.species, reason))
 
@@ -113,7 +148,8 @@ class World:
     def _end_of_tick(self):
         """Leyes naturales al final de cada tick: toda criatura
         viva pierde 1 de vida y suma 1 de edad; muere quien llegue a 0 de
-        vida o alcance su lifespan."""
+        vida o alcance su lifespan. Después el tablero regenera terrenos
+        y retira los objetos agotados."""
         for creature in self.creatures:
             if not creature.alive:
                 continue
@@ -124,6 +160,8 @@ class World:
                 self.kill(creature, "hambre")
             elif creature.age >= creature.lifespan:
                 self.kill(creature, "vejez")
+
+        self.map.end_of_tick()
         self.tick += 1
         # El rugido del tick que acaba se oye durante el próximo (spec 2.6)
         self.roars = [r for r in self.roars if r[0] >= self.tick - 1]
@@ -145,13 +183,22 @@ class World:
             and self._distance_to(creature, other.x, other.y) <= creature.vision
         ]
 
-    def _rocks_in_vision(self, creature):
-        v = creature.vision
+    def _objects_in_vision(self, creature):
+        """Objetos dentro del radio, recortando al tablero.
+
+        El borde del mapa no es un objeto: si no hay casilla, no se cuenta.
+        """
+        vision = creature.vision
+        x_start = max(0, creature.x - vision)
+        x_end = min(self.map.width - 1, creature.x + vision)
+        y_start = max(0, creature.y - vision)
+        y_end = min(self.map.height - 1, creature.y + vision)
+
         return [
             (x, y)
-            for y in range(creature.y - v, creature.y + v + 1)
-            for x in range(creature.x - v, creature.x + v + 1)
-            if self.terrain.terrain_at(x, y) == ROCK
+            for y in range(y_start, y_end + 1)
+            for x in range(x_start, x_end + 1)
+            if self.map.object_at(x, y) is not None
         ]
 
     def _nearest(self, creature, points):
@@ -168,7 +215,8 @@ class World:
         near = self._nearby_creatures(creature)
         allies = [o for o in near if o.faction == creature.faction]
         enemies = [o for o in near if o.faction != creature.faction]
-        rocks = self._rocks_in_vision(creature)
+        objects = self._objects_in_vision(creature)
+        terrain = self.map.terrain_at(creature.x, creature.y)
 
         enemy_dist, enemy_dx, enemy_dy = self._nearest(
             creature, [(c.x, c.y) for c in enemies]
@@ -176,7 +224,7 @@ class World:
         ally_dist, ally_dx, ally_dy = self._nearest(
             creature, [(c.x, c.y) for c in allies]
         )
-        object_dist, object_dx, object_dy = self._nearest(creature, rocks)
+        object_dist, object_dx, object_dy = self._nearest(creature, objects)
 
         heard = [
             r
@@ -195,13 +243,15 @@ class World:
             "faction": creature.faction,
             "x": creature.x,
             "y": creature.y,
-            "terrain_here": self.terrain.terrain_at(creature.x, creature.y),
-            "reserve_here": self.terrain.reserve_at(creature.x, creature.y),
+            "terrain_here": terrain.name if terrain is not None else "",
+            "reserve_here": terrain.reserve if terrain is not None else 0,
             # mundo
-            "width": self.terrain.width,
-            "height": self.terrain.height,
+            "width": self.map.width,
+            "height": self.map.height,
             "tick": self.tick,
-            "total_creatures": sum(1 for c in self.creatures if c.alive),
+            "total_creatures": sum(
+                1 for c in self.creatures if c.alive and c is not creature
+            ),
             "total_allies": sum(
                 1
                 for c in self.creatures
@@ -215,7 +265,7 @@ class World:
             # cerca (radio de visión)
             "allies_near": len(allies),
             "enemies_near": len(enemies),
-            "objects_near": len(rocks),
+            "objects_near": len(objects),
             "enemy_dist": enemy_dist,
             "enemy_dx": enemy_dx,
             "enemy_dy": enemy_dy,
@@ -242,59 +292,50 @@ class World:
 
     def see(self, creature, x, y):
         """NONE si no se ve; si no, ALLY/ENEMY > OBJECT > GROUND."""
-        if self._distance_to(creature, x, y) > creature.vision:
-            return CONSTANTS["NONE"]
-        if x == creature.x and y == creature.y:
-            return CONSTANTS["ALLY"]
-        other = self.creature_at(x, y)
-        if other is not None:
-            return (
-                CONSTANTS["ALLY"]
-                if other.faction == creature.faction
-                else CONSTANTS["ENEMY"]
-            )
-        if self.terrain.terrain_at(x, y) == ROCK:
-            return CONSTANTS["OBJECT"]
-        return CONSTANTS["GROUND"]
+        return self.map.see(creature, x, y)
 
     def name_at(self, creature, x, y):
         """Nombre de lo que hay en (x, y); '' si no se ve o no hay nada."""
-        if self._distance_to(creature, x, y) > creature.vision:
-            return ""
-        other = self.creature_at(x, y)
-        if other is not None:
-            return other.species
-        if self.terrain.terrain_at(x, y) == ROCK:
-            return "Rock"
-        return ""
+        return self.map.name_at(creature, x, y)
 
     # ACTIONS
 
     def move(self, creature, dx, dy, speed):
-        """Avanza hasta `speed` casillas; se para ante roca, borde o bicho."""
+        """Avanza hasta `speed` casillas; se para ante objeto, borde o bicho."""
         for _ in range(max(0, speed)):
             nx, ny = creature.x + dx, creature.y + dy
-            if not self.terrain.is_walkable(nx, ny):
+            if not self.map.is_walkable(nx, ny):
                 break
-            if self.creature_at(nx, ny) is not None:
+            if not self.map.move_creature(creature, nx, ny):
                 break
-            creature.x, creature.y = nx, ny
 
     def _hurt(self, creature, dx, dy, damage, kind):
         """Daña a quien haya en la casilla relativa. (0,0) golpea el
-        terreno bajo la propia criatura."""
+        terreno bajo la propia criatura.
+
+        Prioridad: criatura > objeto > terreno. El objeto no desaparece en
+        el acto: se retira al cerrar el tick, como pide la spec.
+        """
         if dx == 0 and dy == 0:
-            # El objetivo es el terreno bajo la criatura: su reserva baja.
-            # (Las reservas de terreno/objetos llegan con ese modelo; por
-            # ahora un golpe al suelo no tiene efecto que registrar.)
+            terrain = self.map.terrain_at(creature.x, creature.y)
+            if terrain is not None:
+                terrain.damage(damage)
             return
-        target = self.creature_at(creature.x + dx, creature.y + dy)
-        if target is None:
+
+        cell = self.map.cell_at(creature.x + dx, creature.y + dy)
+        if cell is None:
             return  # golpe al aire (violinazo)
-        target.health -= damage
-        if target.health <= 0:
-            target.health = 0
-            self.kill(target, f"{kind} de {creature.species}")
+
+        if cell.creature is not None:
+            target = cell.creature
+            target.health -= damage
+            if target.health <= 0:
+                target.health = 0
+                self.kill(target, f"{kind} de {creature.species}")
+        elif cell.obj is not None:
+            cell.obj.damage(damage)
+        else:
+            cell.terrain.damage(damage)
 
     def attack(self, creature, dx, dy, damage):
         self._hurt(creature, dx, dy, damage, "ataque")
@@ -314,10 +355,8 @@ class World:
         la madre gasta `health` puntos y la cría nace con
         exactamente esa vida, edad 0, sin variables y en 'start'."""
         nx, ny = creature.x + dx, creature.y + dy
-        if not self.terrain.is_walkable(nx, ny):
+        if not self.map.is_walkable(nx, ny):
             return  # aborto natural: no hay casilla
-        if self.creature_at(nx, ny) is not None:
-            return  # aborto natural: casilla ocupada
         if creature.health <= health:
             return  # aborto natural: sin vida de sobra
         child = self.add_creature(creature.species_def, nx, ny)
