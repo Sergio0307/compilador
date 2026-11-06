@@ -3,6 +3,7 @@ from pathlib import Path
 import pygame
 
 from loaders.resource_manager import ResourceManager
+from ui.map import MapView
 
 
 class InstinctApp:
@@ -41,6 +42,10 @@ class InstinctApp:
         )
         self.manager = ResourceManager(root)
         self.load_errors = self.manager.load_all()
+        self.selected_map_index = 0
+        self.map_view = MapView()
+        self.world_map = None
+        self.rebuild_map()
 
         for error in self.load_errors:
             print(f"aviso: {error}")
@@ -49,13 +54,29 @@ class InstinctApp:
     def map_names(self):
         return list(self.manager.maps)
 
+    @property
+    def selected_map(self):
+        maps = list(self.manager.maps.values())
+        if not maps:
+            return None
+        return maps[self.selected_map_index % len(maps)]
+
+    def rebuild_map(self):
+        selected = self.selected_map
+        self.world_map = selected.build() if selected is not None else None
+
     def handle_event(self, event):
-        if (
-            event.type == pygame.QUIT
-            or event.type == pygame.KEYDOWN
-            and event.key == pygame.K_ESCAPE
-        ):
+        if event.type == pygame.QUIT:
             self.running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.running = False
+            elif event.key in (pygame.K_UP, pygame.K_DOWN) and self.manager.maps:
+                step = -1 if event.key == pygame.K_UP else 1
+                self.selected_map_index = (self.selected_map_index + step) % len(
+                    self.manager.maps
+                )
+                self.rebuild_map()
 
     def update(self, dt):
         pass
@@ -76,6 +97,19 @@ class InstinctApp:
             self.MUTED,
         )
 
+        selected = self.selected_map
+        if selected is not None:
+            self.text(
+                self.body_font,
+                f"Mapa seleccionado: {selected.name} "
+                f"({selected.width} x {selected.height})",
+                80,
+                180,
+                self.ACCENT,
+            )
+        else:
+            self.text(self.body_font, "No hay mapas cargados.", 80, 180, self.ERROR)
+
         panel = pygame.Rect(80, 210, 860, 640)
         pygame.draw.rect(self.screen, self.PANEL, panel, border_radius=10)
         pygame.draw.rect(self.screen, self.ACCENT, panel, width=2, border_radius=10)
@@ -83,12 +117,24 @@ class InstinctApp:
         self.text(self.heading_font, "Mapas", 110, 235, self.TEXT)
         y = 285
         if self.manager.maps:
-            for map_def in self.manager.maps.values():
+            for index, map_def in enumerate(self.manager.maps.values()):
+                is_selected = index == self.selected_map_index
+                if is_selected:
+                    highlight = pygame.Rect(108, y - 4, 800, 34)
+                    pygame.draw.rect(
+                        self.screen, (42, 52, 57), highlight, border_radius=6
+                    )
+                    pygame.draw.rect(
+                        self.screen, self.ACCENT, highlight, width=1, border_radius=6
+                    )
+
+                prefix = ">" if is_selected else " "
                 self.text(
                     self.body_font,
-                    f"{map_def.name}  ({map_def.width} x {map_def.height})",
+                    f"{prefix} {map_def.name}  ({map_def.width} x {map_def.height})",
                     120,
                     y,
+                    self.ACCENT if is_selected else self.TEXT,
                 )
                 y += 34
         else:
@@ -108,18 +154,35 @@ class InstinctApp:
         pygame.draw.rect(self.screen, self.PANEL, panel, border_radius=10)
         pygame.draw.rect(self.screen, self.ACCENT, panel, width=2, border_radius=10)
 
-        self.text(self.heading_font, "Errores de carga", 1010, 235, self.TEXT)
-        y = 285
+        self.text(self.heading_font, "Mapa", 1010, 235, self.TEXT)
+        if selected is not None:
+            self.text(
+                self.small_font,
+                f"{selected.name}  ({selected.width} x {selected.height})",
+                1010,
+                270,
+                self.ACCENT,
+            )
+            self.map_view.draw(
+                self.screen,
+                self.world_map,
+                pygame.Rect(1020, 300, 780, 350),
+            )
+        else:
+            self.text(self.body_font, "No hay mapas cargados.", 1020, 300, self.MUTED)
+
+        self.text(self.heading_font, "Errores de carga", 1010, 680, self.TEXT)
+        y = 720
         if self.load_errors:
-            for error in self.load_errors[:14]:
+            for error in self.load_errors[:4]:
                 self.text(self.small_font, str(error)[:110], 1020, y, self.ERROR)
-                y += 26
+                y += 24
         else:
             self.text(self.body_font, "Sin errores.", 1020, y, self.MUTED)
 
         self.text(
             self.small_font,
-            "ESC para salir  |  siguiente paso: elegir mapa y colocar criaturas",
+            "ESC para salir  |  UP/DOWN elige mapa  |  siguiente paso: colocar criaturas",
             80,
             1020,
             self.MUTED,
