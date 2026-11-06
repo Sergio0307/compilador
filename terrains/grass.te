@@ -1,0 +1,4 @@
+terrain Grass
+char .
+resource_max 100
+regen 2

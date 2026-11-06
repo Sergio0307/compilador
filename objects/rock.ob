@@ -1,0 +1,3 @@
+object Rock
+char #
+resource_max 100

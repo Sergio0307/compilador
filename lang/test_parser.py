@@ -1,11 +1,17 @@
 # lang/test_parser.py
+from lang.ast_nodes import (
+    Assign,
+    Block,
+    Call,
+    Goto,
+    IfGoto,
+    Label,
+    SpeciesDef,
+)
+from lang.errors import ParseError
 from lang.lexer import Lexer
 from lang.parser import Parser
 from lang.tokens import TokenType
-from lang.errors import ParseError
-from lang.ast_nodes import (
-    SpeciesDef, Block, Label, IfGoto, Goto, Call, Assign,
-)
 
 
 def test_base():
@@ -68,31 +74,38 @@ def test_primary():
     """parse_primary: numeros, strings, identificadores, parentesis."""
     print("=== parse_primary ===")
     casos = [
-        ("42",         "Number(value=42, line=1)"),
-        ('"hola"',     "String(value='hola', line=1)"),
-        ("health",     "Identifier(name='health', line=1)"),
-        ("random",     "Identifier(name='random', line=1)"),
-        ("(42)",       "Number(value=42, line=1)"),
+        ("42", "Number(value=42, line=1)"),
+        ('"hola"', "String(value='hola', line=1)"),
+        ("health", "Identifier(name='health', line=1)"),
+        ("random", "Identifier(name='random', line=1)"),
+        ("(42)", "Number(value=42, line=1)"),
         ("enemy_dist", "Identifier(name='enemy_dist', line=1)"),
-        ("vision",     "Identifier(name='vision', line=1)"),
-        ("lifespan",   "Identifier(name='lifespan', line=1)"),
-        ("see(1, 2)",  "Call(name='see', args=[Number(value=1, line=1), "
-                       "Number(value=2, line=1)], line=1)"),
-        ("name(1, 2)", "Call(name='name', args=[Number(value=1, line=1), "
-                       "Number(value=2, line=1)], line=1)"),
-        ("see(x, y + 1)",
-                       "Call(name='see', args=[Identifier(name='x', line=1), "
-                       "BinaryOp(op='+', left=Identifier(name='y', line=1), "
-                       "right=Number(value=1, line=1), line=1)], line=1)"),
-        ("f()",        "Call(name='f', args=[], line=1)"),
+        ("vision", "Identifier(name='vision', line=1)"),
+        ("lifespan", "Identifier(name='lifespan', line=1)"),
+        (
+            "see(1, 2)",
+            "Call(name='see', args=[Number(value=1, line=1), "
+            "Number(value=2, line=1)], line=1)",
+        ),
+        (
+            "name(1, 2)",
+            "Call(name='name', args=[Number(value=1, line=1), "
+            "Number(value=2, line=1)], line=1)",
+        ),
+        (
+            "see(x, y + 1)",
+            "Call(name='see', args=[Identifier(name='x', line=1), "
+            "BinaryOp(op='+', left=Identifier(name='y', line=1), "
+            "right=Number(value=1, line=1), line=1)], line=1)",
+        ),
+        ("f()", "Call(name='f', args=[], line=1)"),
     ]
     for src, esperado in casos:
         tokens = Lexer(src + "\n", "test.ins").tokenize()
         p = Parser(tokens, "test.ins")
         expr = p.parse_primary()
         print("  %-12r -> %s" % (src, expr))
-        assert str(expr) == esperado, \
-            "esperado %r, obtenido %r" % (esperado, str(expr))
+        assert str(expr) == esperado, "esperado %r, obtenido %r" % (esperado, str(expr))
     print("=== parse_primary OK ===\n")
 
 
@@ -100,20 +113,25 @@ def test_unary():
     """parse_unary: -x y apilamiento del menos unario."""
     print("=== parse_unary ===")
     casos = [
-        ("-42",     "UnaryOp(op='-', operand=Number(value=42, line=1), line=1)"),
-        ("--5",     "UnaryOp(op='-', operand=UnaryOp(op='-', "
-                    "operand=Number(value=5, line=1), line=1), line=1)"),
-        ("(-5)",    "UnaryOp(op='-', operand=Number(value=5, line=1), line=1)"),
-        ("-random", "UnaryOp(op='-', operand=Identifier(name='random', line=1), line=1)"),
-        ("42",      "Number(value=42, line=1)"),
+        ("-42", "UnaryOp(op='-', operand=Number(value=42, line=1), line=1)"),
+        (
+            "--5",
+            "UnaryOp(op='-', operand=UnaryOp(op='-', "
+            "operand=Number(value=5, line=1), line=1), line=1)",
+        ),
+        ("(-5)", "UnaryOp(op='-', operand=Number(value=5, line=1), line=1)"),
+        (
+            "-random",
+            "UnaryOp(op='-', operand=Identifier(name='random', line=1), line=1)",
+        ),
+        ("42", "Number(value=42, line=1)"),
     ]
     for src, esperado in casos:
         tokens = Lexer(src + "\n", "test.ins").tokenize()
         p = Parser(tokens, "test.ins")
         expr = p.parse_unary()
         print("  %-12r -> %s" % (src, expr))
-        assert str(expr) == esperado, \
-            "esperado %r, obtenido %r" % (esperado, str(expr))
+        assert str(expr) == esperado, "esperado %r, obtenido %r" % (esperado, str(expr))
 
     # '-' solo debe fallar
     print("  %-12r -> debe fallar" % "-")
@@ -132,29 +150,36 @@ def test_not():
     """'not' esta entre 'and' y las comparaciones (estilo Python)."""
     print("=== parse_not ===")
     casos = [
-        ("not scared",
-                    "UnaryOp(op='not', operand=Identifier(name='scared', line=1), line=1)"),
-        ("not not x",
-                    "UnaryOp(op='not', operand=UnaryOp(op='not', "
-                    "operand=Identifier(name='x', line=1), line=1), line=1)"),
+        (
+            "not scared",
+            "UnaryOp(op='not', operand=Identifier(name='scared', line=1), line=1)",
+        ),
+        (
+            "not not x",
+            "UnaryOp(op='not', operand=UnaryOp(op='not', "
+            "operand=Identifier(name='x', line=1), line=1), line=1)",
+        ),
         ("not (x)", "UnaryOp(op='not', operand=Identifier(name='x', line=1), line=1)"),
-        ("not 0",   "UnaryOp(op='not', operand=Number(value=0, line=1), line=1)"),
-        ("not a < b",
-                    "UnaryOp(op='not', operand=BinaryOp(op='<', "
-                    "left=Identifier(name='a', line=1), "
-                    "right=Identifier(name='b', line=1), line=1), line=1)"),
-        ("not a and b",
-                    "BinaryOp(op='and', left=UnaryOp(op='not', "
-                    "operand=Identifier(name='a', line=1), line=1), "
-                    "right=Identifier(name='b', line=1), line=1)"),
+        ("not 0", "UnaryOp(op='not', operand=Number(value=0, line=1), line=1)"),
+        (
+            "not a < b",
+            "UnaryOp(op='not', operand=BinaryOp(op='<', "
+            "left=Identifier(name='a', line=1), "
+            "right=Identifier(name='b', line=1), line=1), line=1)",
+        ),
+        (
+            "not a and b",
+            "BinaryOp(op='and', left=UnaryOp(op='not', "
+            "operand=Identifier(name='a', line=1), line=1), "
+            "right=Identifier(name='b', line=1), line=1)",
+        ),
     ]
     for src, esperado in casos:
         tokens = Lexer(src + "\n", "test.ins").tokenize()
         p = Parser(tokens, "test.ins")
         expr = p.parse_expression()
         print("  %-14r -> %s" % (src, expr))
-        assert str(expr) == esperado, \
-            "esperado %r, obtenido %r" % (esperado, str(expr))
+        assert str(expr) == esperado, "esperado %r, obtenido %r" % (esperado, str(expr))
 
     # 'not' solo debe fallar
     print("  %-14r -> debe fallar" % "not")
@@ -174,68 +199,95 @@ def test_precedence():
     print("=== parse_expression (precedencia) ===")
     casos = [
         # * / % por encima de + -
-        ("1 + 2 * 3",
-         "BinaryOp(op='+', left=Number(value=1, line=1), right=BinaryOp(op='*', "
-         "left=Number(value=2, line=1), right=Number(value=3, line=1), line=1), line=1)"),
-        ("(1 + 2) * 3",
-         "BinaryOp(op='*', left=BinaryOp(op='+', left=Number(value=1, line=1), "
-         "right=Number(value=2, line=1), line=1), right=Number(value=3, line=1), line=1)"),
+        (
+            "1 + 2 * 3",
+            "BinaryOp(op='+', left=Number(value=1, line=1), right=BinaryOp(op='*', "
+            "left=Number(value=2, line=1), right=Number(value=3, line=1), line=1), line=1)",
+        ),
+        (
+            "(1 + 2) * 3",
+            "BinaryOp(op='*', left=BinaryOp(op='+', left=Number(value=1, line=1), "
+            "right=Number(value=2, line=1), line=1), right=Number(value=3, line=1), line=1)",
+        ),
         # asociatividad por la izquierda
-        ("1 + 2 + 3",
-         "BinaryOp(op='+', left=BinaryOp(op='+', left=Number(value=1, line=1), "
-         "right=Number(value=2, line=1), line=1), right=Number(value=3, line=1), line=1)"),
-        ("1 - 2 - 3",
-         "BinaryOp(op='-', left=BinaryOp(op='-', left=Number(value=1, line=1), "
-         "right=Number(value=2, line=1), line=1), right=Number(value=3, line=1), line=1)"),
+        (
+            "1 + 2 + 3",
+            "BinaryOp(op='+', left=BinaryOp(op='+', left=Number(value=1, line=1), "
+            "right=Number(value=2, line=1), line=1), right=Number(value=3, line=1), line=1)",
+        ),
+        (
+            "1 - 2 - 3",
+            "BinaryOp(op='-', left=BinaryOp(op='-', left=Number(value=1, line=1), "
+            "right=Number(value=2, line=1), line=1), right=Number(value=3, line=1), line=1)",
+        ),
         # comparaciones por debajo de + - y por encima de and
-        ("2 + 3 == 5",
-         "BinaryOp(op='==', left=BinaryOp(op='+', left=Number(value=2, line=1), "
-         "right=Number(value=3, line=1), line=1), right=Number(value=5, line=1), line=1)"),
-        ("a < b and c > d",
-         "BinaryOp(op='and', left=BinaryOp(op='<', left=Identifier(name='a', line=1), "
-         "right=Identifier(name='b', line=1), line=1), right=BinaryOp(op='>', "
-         "left=Identifier(name='c', line=1), right=Identifier(name='d', line=1), line=1), line=1)"),
+        (
+            "2 + 3 == 5",
+            "BinaryOp(op='==', left=BinaryOp(op='+', left=Number(value=2, line=1), "
+            "right=Number(value=3, line=1), line=1), right=Number(value=5, line=1), line=1)",
+        ),
+        (
+            "a < b and c > d",
+            "BinaryOp(op='and', left=BinaryOp(op='<', left=Identifier(name='a', line=1), "
+            "right=Identifier(name='b', line=1), line=1), right=BinaryOp(op='>', "
+            "left=Identifier(name='c', line=1), right=Identifier(name='d', line=1), line=1), line=1)",
+        ),
         # and por debajo de comparaciones, or por debajo de and
-        ("a or b and c",
-         "BinaryOp(op='or', left=Identifier(name='a', line=1), right=BinaryOp(op='and', "
-         "left=Identifier(name='b', line=1), right=Identifier(name='c', line=1), line=1), line=1)"),
+        (
+            "a or b and c",
+            "BinaryOp(op='or', left=Identifier(name='a', line=1), right=BinaryOp(op='and', "
+            "left=Identifier(name='b', line=1), right=Identifier(name='c', line=1), line=1), line=1)",
+        ),
         # comparadores nuevos
-        ("a <= b or c >= d",
-         "BinaryOp(op='or', left=BinaryOp(op='<=', left=Identifier(name='a', line=1), "
-         "right=Identifier(name='b', line=1), line=1), right=BinaryOp(op='>=', "
-         "left=Identifier(name='c', line=1), right=Identifier(name='d', line=1), line=1), line=1)"),
+        (
+            "a <= b or c >= d",
+            "BinaryOp(op='or', left=BinaryOp(op='<=', left=Identifier(name='a', line=1), "
+            "right=Identifier(name='b', line=1), line=1), right=BinaryOp(op='>=', "
+            "left=Identifier(name='c', line=1), right=Identifier(name='d', line=1), line=1), line=1)",
+        ),
         # unary y not por encima de * / %
-        ("-2 * 3",
-         "BinaryOp(op='*', left=UnaryOp(op='-', operand=Number(value=2, line=1), line=1), "
-         "right=Number(value=3, line=1), line=1)"),
-        ("2 * -3",
-         "BinaryOp(op='*', left=Number(value=2, line=1), right=UnaryOp(op='-', "
-         "operand=Number(value=3, line=1), line=1), line=1)"),
-        ("not a and b",
-         "BinaryOp(op='and', left=UnaryOp(op='not', operand=Identifier(name='a', line=1), "
-         "line=1), right=Identifier(name='b', line=1), line=1)"),
+        (
+            "-2 * 3",
+            "BinaryOp(op='*', left=UnaryOp(op='-', operand=Number(value=2, line=1), line=1), "
+            "right=Number(value=3, line=1), line=1)",
+        ),
+        (
+            "2 * -3",
+            "BinaryOp(op='*', left=Number(value=2, line=1), right=UnaryOp(op='-', "
+            "operand=Number(value=3, line=1), line=1), line=1)",
+        ),
+        (
+            "not a and b",
+            "BinaryOp(op='and', left=UnaryOp(op='not', operand=Identifier(name='a', line=1), "
+            "line=1), right=Identifier(name='b', line=1), line=1)",
+        ),
         # estilo Python: not por debajo de las comparaciones
-        ("not health < 20",
-         "UnaryOp(op='not', operand=BinaryOp(op='<', "
-         "left=Identifier(name='health', line=1), "
-         "right=Number(value=20, line=1), line=1), line=1)"),
+        (
+            "not health < 20",
+            "UnaryOp(op='not', operand=BinaryOp(op='<', "
+            "left=Identifier(name='health', line=1), "
+            "right=Number(value=20, line=1), line=1), line=1)",
+        ),
         # comparacion encadenada estilo Python: a <= x < b  ->  (a <= x) and (x < b)
-        ("0 <= x < 10",
-         "BinaryOp(op='and', left=BinaryOp(op='<=', left=Number(value=0, line=1), "
-         "right=Identifier(name='x', line=1), line=1), right=BinaryOp(op='<', "
-         "left=Identifier(name='x', line=1), right=Number(value=10, line=1), line=1), line=1)"),
+        (
+            "0 <= x < 10",
+            "BinaryOp(op='and', left=BinaryOp(op='<=', left=Number(value=0, line=1), "
+            "right=Identifier(name='x', line=1), line=1), right=BinaryOp(op='<', "
+            "left=Identifier(name='x', line=1), right=Number(value=10, line=1), line=1), line=1)",
+        ),
         # expresion del ejemplo del propio parser
-        ("random % 3 - 1",
-         "BinaryOp(op='-', left=BinaryOp(op='%', left=Identifier(name='random', line=1), "
-         "right=Number(value=3, line=1), line=1), right=Number(value=1, line=1), line=1)"),
+        (
+            "random % 3 - 1",
+            "BinaryOp(op='-', left=BinaryOp(op='%', left=Identifier(name='random', line=1), "
+            "right=Number(value=3, line=1), line=1), right=Number(value=1, line=1), line=1)",
+        ),
     ]
     for src, esperado in casos:
         tokens = Lexer(src + "\n", "test.ins").tokenize()
         p = Parser(tokens, "test.ins")
         expr = p.parse_expression()
         print("  %-16r -> %s" % (src, expr))
-        assert str(expr) == esperado, \
-            "esperado %r, obtenido %r" % (esperado, str(expr))
+        assert str(expr) == esperado, "esperado %r, obtenido %r" % (esperado, str(expr))
     print("=== parse_expression OK ===\n")
 
 
@@ -244,12 +296,14 @@ def test_header():
     print("=== parse_header ===")
 
     # 1. cabecera completa, claves en orden libre
-    src = ("creature Uruk\n"
-           "lifespan 400\n"
-           "faction isengard\n"
-           "health 80\n"
-           "vision 6\n"
-           "start:\n")
+    src = (
+        "creature Uruk\n"
+        "lifespan 400\n"
+        "faction isengard\n"
+        "health 80\n"
+        "vision 6\n"
+        "start:\n"
+    )
     p = Parser(Lexer(src, "test.ins").tokenize(), "test.ins")
     entries = p.parse_header()
     print("  completa:", entries)
@@ -284,15 +338,15 @@ def test_header():
     # 4. errores: (fuente, fragmento que debe aparecer en el mensaje)
     casos = [
         ("faction isengard\nstart:\n", "primera línea de la cabecera"),
-        ("start:\n",                   "primera línea no vacía"),
-        ("creature\nstart:\n",         "se esperaba un valor"),
+        ("start:\n", "primera línea no vacía"),
+        ("creature\nstart:\n", "se esperaba un valor"),
         ("creature Uruk\nhealth\nstart:\n", "se esperaba un valor"),
         ("creature Uruk\nhealth 80 90\nstart:\n", "fin de línea"),
         ("creature Uruk\nhealth 80 + 5\nstart:\n", "fin de línea"),
         ("creature Uruk\nhealth -vida\nstart:\n", "se esperaba un número"),
         ("creature Uruk\nif 5\nstart:\n", "clave de cabecera"),
-        ("creature Uruk\n",            "falta la etiqueta"),
-        ("",                           "falta la etiqueta"),
+        ("creature Uruk\n", "falta la etiqueta"),
+        ("", "falta la etiqueta"),
     ]
     for src, esperado in casos:
         print("  %-42r -> debe fallar" % src)
@@ -301,8 +355,9 @@ def test_header():
             p.parse_header()
             raise AssertionError("debio fallar: %r" % src)
         except ParseError as e:
-            assert esperado.lower() in str(e).lower(), \
-                "esperaba %r en el mensaje, obtenido %r" % (esperado, str(e))
+            assert (
+                esperado.lower() in str(e).lower()
+            ), "esperaba %r en el mensaje, obtenido %r" % (esperado, str(e))
             print("     OK, ParseError:", e)
 
     print("=== parse_header OK ===\n")
@@ -319,51 +374,60 @@ def test_statement():
     # 1. formas válidas -> nodo AST esperado
     casos = [
         ("wander:", "Label(name='wander', line=1)"),
-        ("start:",  "Label(name='start', line=1)"),
+        ("start:", "Label(name='start', line=1)"),
         ("goto start", "Goto(label='start', line=1)"),
-        ("if health < 20 goto flee",
-         "IfGoto(condition=BinaryOp(op='<', left=Identifier(name='health', line=1), "
-         "right=Number(value=20, line=1), line=1), label='flee', line=1)"),
-        ("if see(x, y + 1) != GROUND goto wander",
-         "IfGoto(condition=BinaryOp(op='!=', left=Call(name='see', args=["
-         "Identifier(name='x', line=1), BinaryOp(op='+', "
-         "left=Identifier(name='y', line=1), right=Number(value=1, line=1), "
-         "line=1)], line=1), right=Identifier(name='GROUND', line=1), line=1), "
-         "label='wander', line=1)"),
-        ("steps = steps + 1",
-         "Assign(name='steps', expr=BinaryOp(op='+', "
-         "left=Identifier(name='steps', line=1), right=Number(value=1, line=1), "
-         "line=1), line=1)"),
-        ('say("meat is back")',
-         "Call(name='say', args=[String(value='meat is back', line=1)], line=1)"),
+        (
+            "if health < 20 goto flee",
+            "IfGoto(condition=BinaryOp(op='<', left=Identifier(name='health', line=1), "
+            "right=Number(value=20, line=1), line=1), label='flee', line=1)",
+        ),
+        (
+            "if see(x, y + 1) != GROUND goto wander",
+            "IfGoto(condition=BinaryOp(op='!=', left=Call(name='see', args=["
+            "Identifier(name='x', line=1), BinaryOp(op='+', "
+            "left=Identifier(name='y', line=1), right=Number(value=1, line=1), "
+            "line=1)], line=1), right=Identifier(name='GROUND', line=1), line=1), "
+            "label='wander', line=1)",
+        ),
+        (
+            "steps = steps + 1",
+            "Assign(name='steps', expr=BinaryOp(op='+', "
+            "left=Identifier(name='steps', line=1), right=Number(value=1, line=1), "
+            "line=1), line=1)",
+        ),
+        (
+            'say("meat is back")',
+            "Call(name='say', args=[String(value='meat is back', line=1)], line=1)",
+        ),
         ("wait()", "Call(name='wait', args=[], line=1)"),
-        ("move(-enemy_dx, -enemy_dy, 3)",
-         "Call(name='move', args=[UnaryOp(op='-', "
-         "operand=Identifier(name='enemy_dx', line=1), line=1), "
-         "UnaryOp(op='-', operand=Identifier(name='enemy_dy', line=1), line=1), "
-         "Number(value=3, line=1)], line=1)"),
+        (
+            "move(-enemy_dx, -enemy_dy, 3)",
+            "Call(name='move', args=[UnaryOp(op='-', "
+            "operand=Identifier(name='enemy_dx', line=1), line=1), "
+            "UnaryOp(op='-', operand=Identifier(name='enemy_dy', line=1), line=1), "
+            "Number(value=3, line=1)], line=1)",
+        ),
     ]
     for src, esperado in casos:
         p, node = parse(src)
         print("  %-38r -> %s" % (src, node))
-        assert str(node) == esperado, \
-            "esperado %r, obtenido %r" % (esperado, str(node))
+        assert str(node) == esperado, "esperado %r, obtenido %r" % (esperado, str(node))
         # la línea se consume entera: quedamos en EOF
         assert p.peek().type == TokenType.EOF, "no consumió el NEWLINE final"
     print("   OK, formas válidas\n")
 
     # 2. errores: (fuente, fragmento del mensaje)
     casos_error = [
-        ("foo + 1",           "línea no válida"),
-        ("goto 5",            "nombre de una etiqueta"),
-        ("goto",              "nombre de una etiqueta"),
+        ("foo + 1", "línea no válida"),
+        ("goto 5", "nombre de una etiqueta"),
+        ("goto", "nombre de una etiqueta"),
         ("if health < 20 flee", "'goto'"),
-        ("if",                "esperaba una expresion"),
-        ("if health goto",    "nombre de una etiqueta"),
-        ("move(1, 0, 1) x",   "fin de línea"),
-        ("wander: x",         "fin de línea"),
-        ("goto start + 1",    "fin de línea"),
-        ("2 + 3",             "instrucción"),
+        ("if", "esperaba una expresion"),
+        ("if health goto", "nombre de una etiqueta"),
+        ("move(1, 0, 1) x", "fin de línea"),
+        ("wander: x", "fin de línea"),
+        ("goto start + 1", "fin de línea"),
+        ("2 + 3", "instrucción"),
     ]
     for src, esperado in casos_error:
         print("  %-38r -> debe fallar" % src)
@@ -372,8 +436,9 @@ def test_statement():
             p.parse_statement()
             raise AssertionError("debio fallar: %r" % src)
         except ParseError as e:
-            assert esperado.lower() in str(e).lower(), \
-                "esperaba %r en el mensaje, obtenido %r" % (esperado, str(e))
+            assert (
+                esperado.lower() in str(e).lower()
+            ), "esperaba %r en el mensaje, obtenido %r" % (esperado, str(e))
             print("     OK, ParseError:", e)
 
     print("=== parse_statement OK ===\n")
