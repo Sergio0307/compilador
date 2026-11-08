@@ -4,6 +4,7 @@ import pygame
 
 from loaders.resource_manager import ResourceManager
 from ui.map import MapView
+from world.world import World
 
 
 class InstinctApp:
@@ -17,6 +18,7 @@ class InstinctApp:
     MUTED = (148, 163, 168)
     ACCENT = (214, 168, 74)
     ERROR = (232, 104, 104)
+    MAP_RECT = pygame.Rect(1020, 300, 780, 350)
 
     def __init__(self, content_root=None):
         pygame.font.init()
@@ -43,8 +45,12 @@ class InstinctApp:
         self.manager = ResourceManager(root)
         self.load_errors = self.manager.load_all()
         self.selected_map_index = 0
+        self.selected_species_index = 0
         self.map_view = MapView()
         self.world_map = None
+        self.world = None
+        self.status = ""
+        self.status_is_error = False
         self.rebuild_map()
 
         for error in self.load_errors:
@@ -61,9 +67,47 @@ class InstinctApp:
             return None
         return maps[self.selected_map_index % len(maps)]
 
+    @property
+    def selected_species(self):
+        species = list(self.manager.creatures.values())
+        if not species:
+            return None
+        return species[self.selected_species_index % len(species)]
+
     def rebuild_map(self):
         selected = self.selected_map
-        self.world_map = selected.build() if selected is not None else None
+        if selected is None:
+            self.world_map = None
+            self.world = None
+            return
+
+        self.world_map = selected.build()
+        self.world = World(self.world_map)
+
+    def place_creature(self, position):
+        if self.world is None:
+            self.set_status("No hay un mapa cargado.", error=True)
+            return
+
+        species = self.selected_species
+        if species is None:
+            self.set_status("No hay criaturas cargadas.", error=True)
+            return
+
+        cell = self.map_view.screen_to_cell(position, self.world_map, self.MAP_RECT)
+        if cell is None:
+            return
+
+        try:
+            creature = self.world.add_creature(species, cell[0], cell[1])
+        except ValueError as exc:
+            self.set_status(str(exc), error=True)
+        else:
+            self.set_status(f"{creature.species} colocado en ({cell[0]}, {cell[1]})")
+
+    def set_status(self, message, error=False):
+        self.status = message
+        self.status_is_error = error
 
     def handle_event(self, event):
         if event.type == pygame.QUIT:
@@ -77,6 +121,17 @@ class InstinctApp:
                     self.manager.maps
                 )
                 self.rebuild_map()
+                self.set_status("")
+            elif (
+                event.key in (pygame.K_LEFT, pygame.K_RIGHT) and self.manager.creatures
+            ):
+                step = -1 if event.key == pygame.K_LEFT else 1
+                self.selected_species_index = (
+                    self.selected_species_index + step
+                ) % len(self.manager.creatures)
+                self.set_status("")
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.place_creature(event.pos)
 
     def update(self, dt):
         pass
@@ -144,8 +199,25 @@ class InstinctApp:
         self.text(self.heading_font, "Criaturas", 110, y, self.TEXT)
         y += 48
         if self.manager.creatures:
-            for name in self.manager.creatures:
-                self.text(self.body_font, name, 120, y)
+            for index, name in enumerate(self.manager.creatures):
+                is_selected = index == self.selected_species_index
+                if is_selected:
+                    highlight = pygame.Rect(108, y - 4, 800, 30)
+                    pygame.draw.rect(
+                        self.screen, (42, 52, 57), highlight, border_radius=6
+                    )
+                    pygame.draw.rect(
+                        self.screen, self.ACCENT, highlight, width=1, border_radius=6
+                    )
+
+                prefix = ">" if is_selected else " "
+                self.text(
+                    self.body_font,
+                    f"{prefix} {name}",
+                    120,
+                    y,
+                    self.ACCENT if is_selected else self.TEXT,
+                )
                 y += 30
         else:
             self.text(self.body_font, "(ninguna)", 120, y, self.MUTED)
@@ -166,7 +238,7 @@ class InstinctApp:
             self.map_view.draw(
                 self.screen,
                 self.world_map,
-                pygame.Rect(1020, 300, 780, 350),
+                self.MAP_RECT,
             )
         else:
             self.text(self.body_font, "No hay mapas cargados.", 1020, 300, self.MUTED)
@@ -180,9 +252,18 @@ class InstinctApp:
         else:
             self.text(self.body_font, "Sin errores.", 1020, y, self.MUTED)
 
+        if self.status:
+            self.text(
+                self.small_font,
+                self.status[:120],
+                80,
+                975,
+                self.ERROR if self.status_is_error else self.ACCENT,
+            )
+
         self.text(
             self.small_font,
-            "ESC para salir  |  UP/DOWN elige mapa  |  siguiente paso: colocar criaturas",
+            "ESC salir  |  UP/DOWN mapa  |  LEFT/RIGHT especie  |  click coloca criatura",
             80,
             1020,
             self.MUTED,
