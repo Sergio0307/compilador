@@ -113,6 +113,12 @@ class World:
         """Criatura viva que ocupa (x, y), o None."""
         return self.map.creature_at(x, y)
 
+    def remove_creature(self, creature):
+        """Quita una criatura del tablero durante la fase de preparación antes de comenzar la simulación"""
+        if creature in self.creatures:
+            self.creatures.remove(creature)
+        self.map.remove_creature(creature)
+
     def kill(self, creature, reason):
         """Saca a la criatura del tablero y registra la muerte."""
         if not creature.alive:

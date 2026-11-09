@@ -56,6 +56,23 @@ def test_mundo_con_mapa():
     print("=== mundo con mapa OK ===\n")
 
 
+def test_remove_creature():
+    """remove_creature lo saca del mapa sin marcarlo como muerto."""
+    print("=== remove_creature ===")
+    w = World(10, 10)
+    c = w.add_creature(compilar(), 5, 5)
+    log_length = len(w.log)
+
+    w.remove_creature(c)
+
+    assert c not in w.creatures
+    assert w.creature_at(5, 5) is None
+    assert (5, 5) in w.free_cells()
+    assert c.alive
+    assert len(w.log) == log_length
+    print("  OK, eliminada sin muerte ni log")
+
+
 def test_move():
     """move se para en roca, en el borde y contra otra criatura."""
     print("=== move ===")
@@ -373,6 +390,7 @@ def test_roar():
 
 def main():
     test_nacimiento()
+    test_remove_creature()
     test_move()
     test_attack()
     test_objetos_y_regen()
