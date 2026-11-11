@@ -1,0 +1,3 @@
+object Rune
+char *
+resource_max 20

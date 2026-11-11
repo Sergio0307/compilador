@@ -1,0 +1,25 @@
+# Dota 2: Roshan, the neutral boss
+creature Roshan
+faction neutral
+health 600
+vision 5
+lifespan 9999
+
+start:
+    if enemy_dist == 1 goto smash
+    if enemy_dist > 0 goto charge
+    if roars_near > 0 goto answer
+    wait(1)
+    goto start
+
+smash:
+    attack(enemy_dx, enemy_dy, 25)
+    goto start
+
+charge:
+    move(enemy_dx, enemy_dy, 1)
+    goto start
+
+answer:
+    roar("ROSHAN")
+    goto start

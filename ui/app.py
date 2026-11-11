@@ -21,6 +21,7 @@ class InstinctApp:
     MAP_RECT = pygame.Rect(1020, 300, 780, 350)
     START_BUTTON = pygame.Rect(110, 780, 220, 48)
     RESTART_BUTTON = pygame.Rect(1710, 162, 150, 40)
+    LOG_RECT = pygame.Rect(100, 468, 820, 292)
     SPEEDS = (2, 10, 30)
     SPEED_BUTTONS = (
         pygame.Rect(610, 786, 64, 36),
@@ -223,6 +224,82 @@ class InstinctApp:
         self.status = message
         self.status_is_error = error
 
+    @staticmethod
+    def format_log_entry(entry):
+        kind, tick, name, value = entry
+        if kind == "dice":
+            body = f"{name} dice: {value}"
+        elif kind == "rugido":
+            body = f"{name} ruge: {value}"
+        elif kind == "muerte":
+            body = f"{name} muere ({value})"
+        elif kind == "nacimiento":
+            body = f"{name} nace en {value}"
+        else:
+            body = f"{kind}: {name} {value}"
+        return f"[t{tick}] {body}".replace("\n", " ")
+
+    def clipped(self, font, text, max_width):
+        if font.size(text)[0] <= max_width:
+            return text
+
+        while text and font.size(text + "…")[0] > max_width:
+            text = text[:-1]
+        return text + "…"
+
+    def log_color(self, kind):
+        return {
+            "muerte": self.ERROR,
+            "nacimiento": (122, 190, 140),
+            "rugido": self.ACCENT,
+            "dice": (150, 180, 200),
+        }.get(kind, self.MUTED)
+
+    def draw_log(self, top):
+        top = max(self.LOG_RECT.top, min(top, self.LOG_RECT.bottom))
+        height = self.LOG_RECT.bottom - top
+        if height < 70:
+            return
+
+        rect = pygame.Rect(self.LOG_RECT.left, top, self.LOG_RECT.width, height)
+        pygame.draw.rect(self.screen, (24, 31, 35), rect, border_radius=8)
+        pygame.draw.rect(
+            self.screen,
+            (56, 68, 74),
+            rect,
+            width=1,
+            border_radius=8,
+        )
+        self.text(self.body_font, "Registro", 115, top + 10, self.TEXT)
+
+        max_lines = max(1, (height - 52) // 24)
+        entries = self.world.log[-max_lines:] if self.world is not None else []
+        if not entries:
+            self.text(
+                self.small_font,
+                "Sin eventos todavía.",
+                120,
+                top + 44,
+                self.MUTED,
+            )
+            return
+
+        y = top + 44
+        for entry in entries:
+            line = self.clipped(
+                self.small_font,
+                self.format_log_entry(entry),
+                rect.width - 30,
+            )
+            self.text(
+                self.small_font,
+                line,
+                120,
+                y,
+                self.log_color(entry[0]),
+            )
+            y += 24
+
     def handle_event(self, event):
         if event.type == pygame.QUIT:
             self.running = False
@@ -347,9 +424,7 @@ class InstinctApp:
                 width=1,
                 border_radius=8,
             )
-            restart_label = self.small_font.render(
-                "Reiniciar (R)", True, self.TEXT
-            )
+            restart_label = self.small_font.render("Reiniciar (R)", True, self.TEXT)
             self.screen.blit(
                 restart_label,
                 restart_label.get_rect(center=self.RESTART_BUTTON.center),
@@ -411,6 +486,8 @@ class InstinctApp:
                 y += 30
         else:
             self.text(self.body_font, "(ninguna)", 120, y, self.MUTED)
+
+        self.draw_log(y + 26)
 
         if self.phase == "preparation":
             button_label = "Empezar"

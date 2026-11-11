@@ -1,0 +1,23 @@
+# Dota 2: Dire melee creep
+creature DireCreep
+faction dire
+health 55
+vision 4
+lifespan 300
+
+start:
+    if enemy_dist == 1 goto fight
+    if enemy_dist > 0 goto advance
+    goto patrol
+
+fight:
+    attack(enemy_dx, enemy_dy, 8)
+    goto start
+
+advance:
+    move(enemy_dx, enemy_dy, 1)
+    goto start
+
+patrol:
+    move(random % 3 - 1, random % 3 - 1, 1)
+    goto start

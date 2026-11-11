@@ -1,0 +1,3 @@
+object Tree
+char T
+resource_max 60
