@@ -1,0 +1,30 @@
+creature Ent
+faction fangorn
+health 150
+vision 4
+lifespan 1000
+
+start:
+    home_x = x
+    home_y = y
+watch:
+    if enemy_dist == 1 goto hit
+    if enemies_near > 0 and roars_near == 0 goto warn
+    if x != home_x or y != home_y goto go_home
+    if health < 150 goto roots
+    wait(1)
+    goto watch
+hit:
+    attack(enemy_dx, enemy_dy, 12)
+    goto watch
+warn:
+    roar("hoom, hom, do not be hasty")
+    goto watch
+roots:
+    consume(0, 0, 3, 3)
+    goto watch
+go_home:
+    dx = (home_x > x) - (home_x < x)
+    dy = (home_y > y) - (home_y < y)
+    move(dx, dy, 1)
+    goto watch

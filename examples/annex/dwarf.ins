@@ -1,0 +1,30 @@
+creature Dwarf
+faction erebor
+health 100
+vision 3
+lifespan 600
+
+start:
+    if last_roar == "khazad ai-menu" goto rescue
+    if object_dist == 1 and health < 100 goto mine
+    dx = random % 3 - 1
+    dy = random % 3 - 1
+    steps = 0
+walk:
+    if steps >= 5 goto start
+    if enemy_dist == 1 goto shout
+    move(dx, dy, 1)
+    steps = steps + 1
+    goto walk
+mine:
+    # never too greedily and too deep
+    if name(x + object_dx, y + object_dy) != "Rock" goto start
+    consume(object_dx, object_dy, 20, 20)
+    goto start
+shout:
+    roar("khazad ai-menu")
+    goto start
+rescue:
+    say("and my axe")
+    move(ally_dx, ally_dy, 2)
+    goto start

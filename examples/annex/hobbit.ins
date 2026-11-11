@@ -1,0 +1,34 @@
+creature Hobbit
+faction shire
+health 60
+vision 5
+lifespan 300
+
+start:
+    if enemy_dist >= 0 goto flee
+    if health > 45 and total_allies < 20 goto breed
+    if reserve_here > 0 and health < 80 goto second_breakfast
+    if ally_dist > 1 goto go_ally
+    wait(1)
+    goto start
+flee:
+    say("they are taking us to Isengard")
+    move(-enemy_dx, -enemy_dy, 2)
+    goto start
+second_breakfast:
+    consume(0, 0, 10, 10)
+    goto start
+go_ally:
+    move(ally_dx, ally_dy, 1)
+    goto start
+breed:
+    if see(x + 1, y) == GROUND goto breed_right
+    if see(x - 1, y) == GROUND goto breed_left
+    wait(1)
+    goto start
+breed_right:
+    reproduce(1, 0, 20)
+    goto start
+breed_left:
+    reproduce(-1, 0, 20)
+    goto start
