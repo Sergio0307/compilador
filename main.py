@@ -73,7 +73,7 @@ def main(argv=None):
         "--map",
         dest="map_name",
         default=None,
-        help="nombre del mapa; si se omite y no hay archivos, usa el primero",
+        help="nombre del mapa, si se omite y no hay archivos, usa el primero",
     )
     parser.add_argument(
         "--width",

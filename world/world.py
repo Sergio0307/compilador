@@ -15,10 +15,10 @@ encarga del bucle de turnos y de traducir las acciones a operaciones
 sobre ese tablero.
 
 Reglas fijadas en el diseño:
- - radio de visión cuadrado de Chebyshev, sin línea de visión;
- - "roars_near" = rugidos del tick anterior dentro del radio;
- - "reproduce" gasta vida a la madre y la cría nace sin tope;
- - orden de turno = sorteo al azar en cada tick;
+ - radio de visión cuadrado de Chebyshev, sin línea de visión.
+ - "roars_near" = rugidos del tick anterior dentro del radio.
+ - "reproduce" gasta vida a la madre y la cría nace sin tope.
+ - orden de turno = sorteo al azar en cada tick.
  - leyes naturales al cierre del tick: vida -1, edad +1, verificar
    muertes, regenerar terrenos y retirar objetos agotados.
 """
@@ -147,13 +147,14 @@ class World:
             try:
                 self.interpreter.run_turn(creature, self)
             except RuntimeFault as fault:
-                self.kill(creature, f"ictus: {fault.message}")
+                line = f" (línea {fault.line})" if fault.line is not None else ""
+                self.kill(creature, f"ictus: {fault.message}{line}")
         self._end_of_tick()
         return [c for c in self.creatures if c.alive]
 
     def _end_of_tick(self):
         """Leyes naturales al final de cada tick: toda criatura
-        viva pierde 1 de vida y suma 1 de edad; muere quien llegue a 0 de
+        viva pierde 1 de vida y suma 1 de edad, muere quien llegue a 0 de
         vida o alcance su lifespan. Después el tablero regenera terrenos
         y retira los objetos agotados."""
         for creature in self.creatures:
@@ -208,7 +209,7 @@ class World:
         ]
 
     def _nearest(self, creature, points):
-        """(dist, dx, dy) hacia el más cercano; (-1, 0, 0) si no hay ninguno."""
+        """(dist, dx, dy) hacia el más cercano, (-1, 0, 0) si no hay ninguno."""
         best = None
         for px, py in points:
             dist = self._distance_to(creature, px, py)
@@ -297,17 +298,17 @@ class World:
     # ------------------------------------------------------------------
 
     def see(self, creature, x, y):
-        """NONE si no se ve; si no, ALLY/ENEMY > OBJECT > GROUND."""
+        """NONE si no se ve, si no, ALLY/ENEMY > OBJECT > GROUND."""
         return self.map.see(creature, x, y)
 
     def name_at(self, creature, x, y):
-        """Nombre de lo que hay en (x, y); '' si no se ve o no hay nada."""
+        """Nombre de lo que hay en (x, y), '' si no se ve o no hay nada."""
         return self.map.name_at(creature, x, y)
 
     # ACTIONS
 
     def move(self, creature, dx, dy, speed):
-        """Avanza hasta `speed` casillas; se para ante objeto, borde o bicho."""
+        """Avanza hasta `speed` casillas, se para ante objeto, borde o bicho."""
         for _ in range(max(0, speed)):
             nx, ny = creature.x + dx, creature.y + dy
             if not self.map.is_walkable(nx, ny):

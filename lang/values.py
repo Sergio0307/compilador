@@ -2,7 +2,7 @@
 
 En la base solo existen dos tipos: enteros y texto. Aquí viven la noción
 de verdad y los operadores. Cada operador es un objeto que sabe validarse
-(`check`) y aplicarse (`apply`); las bases de categoría ajustan la
+(`check`) y aplicarse (`apply`), las bases de categoría ajustan la
 validación una sola vez, sin repetirla por operador (sección 5: nada de
 cadenas de ifs). Ni estas clases ni las funciones conocen al intérprete
 ni al mundo: reciben valores, devuelven valores, o lanzan RuntimeFault con
@@ -13,20 +13,20 @@ from abc import ABC, abstractmethod
 
 from lang.errors import RuntimeFault
 
-
 # --------------------------------------------------------------------------
 # Nociones comunes
 # --------------------------------------------------------------------------
 
+
 def is_truthy(value):
     """Verdad al estilo Instinct (spec 2.5): falso es el entero 0 y el texto
-    vacío; todo lo demás es verdadero. No compara tipos, así que se traga
+    vacío, todo lo demás es verdadero. No compara tipos, así que se traga
     cualquier valor (lo usan `and`, `or`, `not` y la condición de `if`)."""
     if isinstance(value, int):
         return value != 0
     if isinstance(value, str):
         return value != ""
-    return True   # en la base no hay más tipos
+    return True  # en la base no hay más tipos
 
 
 def type_name(value):
@@ -36,7 +36,7 @@ def type_name(value):
 
 def _check_same_type(op, a, b, line):
     """Todos los operadores salvo los lógicos exigen el mismo tipo a los dos
-    lados (spec 2.5); si no, error en tiempo de ejecución."""
+    lados (spec 2.5), si no, error en tiempo de ejecución."""
     if type(a) is not type(b):
         raise RuntimeFault(
             f"no se puede aplicar '{op}' a {type_name(a)} y {type_name(b)}",
@@ -60,17 +60,18 @@ def _reject_zero(divisor, line):
 # Operadores binarios
 # --------------------------------------------------------------------------
 
+
 class BinaryOperator(ABC):
     """Un operador de dos operandos. `symbol` es su nombre en el lenguaje."""
 
     symbol = ""
 
     def __call__(self, a, b, line=None):
-        self.check(a, b, line)     # validación
-        return self.apply(a, b)    # efecto
+        self.check(a, b, line)  # validación
+        return self.apply(a, b)  # efecto
 
     def check(self, a, b, line):
-        """Por defecto, mismo tipo a los dos lados; las categorías afinan."""
+        """Por defecto, mismo tipo a los dos lados, las categorías afinan."""
         _check_same_type(self.symbol, a, b, line)
 
     @abstractmethod
@@ -80,6 +81,7 @@ class BinaryOperator(ABC):
 
 class LogicalOperator(BinaryOperator):
     """and / or: no comparan nada, se tragan cualquier combinación de tipos."""
+
     def check(self, a, b, line):
         pass
 
@@ -157,7 +159,7 @@ class Ge(OrderOperator):
 
 
 class ArithmeticOperator(NumericOperator):
-    """+ - * / %: enteros; '/' es división entera y '%' el resto de Python."""
+    """+ - * / %: enteros, '/' es división entera y '%' el resto de Python."""
 
 
 class Add(ArithmeticOperator):
@@ -207,6 +209,7 @@ class Mod(ArithmeticOperator):
 # Operadores unarios
 # --------------------------------------------------------------------------
 
+
 class UnaryOperator(ABC):
     """Un operador de un solo operando: menos unario y not."""
 
@@ -217,7 +220,7 @@ class UnaryOperator(ABC):
         return self.apply(value)
 
     def check(self, value, line):
-        """Por defecto no valida nada; `Neg` exige número."""
+        """Por defecto no valida nada, `Neg` exige número."""
 
     @abstractmethod
     def apply(self, value):
@@ -245,10 +248,24 @@ class Not(UnaryOperator):
 # Registros y puntos de entrada
 # --------------------------------------------------------------------------
 
-BINARY_OPERATORS = {op.symbol: op for op in (
-    And(), Or(), Eq(), Ne(), Lt(), Le(), Gt(), Ge(),
-    Add(), Sub(), Mul(), Div(), Mod(),
-)}
+BINARY_OPERATORS = {
+    op.symbol: op
+    for op in (
+        And(),
+        Or(),
+        Eq(),
+        Ne(),
+        Lt(),
+        Le(),
+        Gt(),
+        Ge(),
+        Add(),
+        Sub(),
+        Mul(),
+        Div(),
+        Mod(),
+    )
+}
 
 UNARY_OPERATORS = {op.symbol: op for op in (Neg(), Not())}
 

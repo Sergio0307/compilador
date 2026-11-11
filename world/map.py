@@ -96,11 +96,11 @@ class WorldMap:
         """Valor de see(x, y) para viewer
 
         El orden importa:
-        1. fuera del radio de visión -> NONE;
-        2. la propia casilla -> ALLY;
-        3. fuera del mapa pero dentro de visión -> OBJECT (borde);
-        4. criatura -> ALLY/ENEMY según facción;
-        5. objeto -> OBJECT;
+        1. fuera del radio de visión -> NONE.
+        2. la propia casilla -> ALLY.
+        3. fuera del mapa pero dentro de visión -> OBJECT (borde).
+        4. criatura -> ALLY/ENEMY según facción.
+        5. objeto -> OBJECT.
         6. terreno solo -> GROUND.
         """
         if self._distance(viewer, x, y) > viewer.vision:

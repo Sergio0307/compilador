@@ -2,7 +2,7 @@
 
 Ejecuta un turno completo de una criatura ya compilada, con su presupuesto
 de 100 instrucciones. El mundo (world/) llama a
-`Interpreter.run_turn(creature, world)`; aquí no se conoce el terreno ni la
+`Interpreter.run_turn(creature, world)`, aquí no se conoce el terreno ni la
 simulación, solo el contrato que ya usan los nodos del AST y las acciones:
 
     ctx.resolve / ctx.binary / ctx.unary / ctx.call_function   (ast_nodes)
@@ -106,7 +106,7 @@ class EvalContext:
         self.state = state
 
     def resolve(self, name, line=None):
-        """Variable propia -> constante -> percepción; si no, error."""
+        """Variable propia -> constante -> percepción, si no, error."""
         if name in self.state.variables:
             return self.state.variables[name]
         if name in CONSTANTS:
@@ -153,7 +153,7 @@ class Interpreter:
         if not state.program.instructions:  # 'start:' vacío: no hay nada
             return
         if state.pc >= len(state.program.instructions):
-            # quedó en el fin del archivo la ronda anterior;
+            # quedó en el fin del archivo la ronda anterior,
             # este turno arranca desde 'start:'.
             state.pc = state.program.labels.get("start", 0)
 

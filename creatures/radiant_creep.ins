@@ -6,18 +6,44 @@ vision 4
 lifespan 300
 
 start:
+    # The lane anchor is assigned once, then reused every turn.
+    lane_x = x
+    lane_y = y
+    goto think
+
+think:
     if enemy_dist == 1 goto fight
     if enemy_dist > 0 goto advance
     goto patrol
 
 fight:
     attack(enemy_dx, enemy_dy, 8)
-    goto start
+    goto think
 
 advance:
     move(enemy_dx, enemy_dy, 1)
-    goto start
+    goto think
 
 patrol:
+    if x > lane_x + 2 goto west
+    if x < lane_x - 2 goto east
+    if y > lane_y + 2 goto north
+    if y < lane_y - 2 goto south
     move(random % 3 - 1, random % 3 - 1, 1)
-    goto start
+    goto think
+
+west:
+    move(-1, 0, 1)
+    goto think
+
+east:
+    move(1, 0, 1)
+    goto think
+
+north:
+    move(0, -1, 1)
+    goto think
+
+south:
+    move(0, 1, 1)
+    goto think

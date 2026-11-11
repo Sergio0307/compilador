@@ -118,7 +118,7 @@ def test_registro_acciones():
 
 
 def test_turno_accion():
-    """Una acción consume el turno; el pc avanza a la instrucción siguiente."""
+    """Una acción consume el turno, el pc avanza a la instrucción siguiente."""
     print("=== turno con acción ===")
     _, execution, world = run_turns("move(1, 0, 2)\ngoto start\n")
     assert world.calls == [("move", 1, 0, 2)], world.calls  # el goto no corrió
@@ -180,7 +180,7 @@ def test_wrap_proximo_turno():
     assert execution.pc == 0, execution.pc  # quedó en start
     interp.run_turn(creature, world)
     assert world.calls == [("say", "a"), ("say", "a")], world.calls
-    print("  OK, un say por turno; en el 2º retomó desde start")
+    print("  OK, un say por turno, en el 2º retomó desde start")
     print("=== wrap al próximo turno OK ===\n")
 
 
@@ -198,7 +198,7 @@ def test_memoria_entre_turnos():
     )
     _, execution, world = run_turns(body, turns=2)
     assert execution.variables["count"] == 3, execution.variables
-    # el turno 1 espera con count=3; el 2 retoma en 'say(count)' sin resetear
+    # el turno 1 espera con count=3, el 2 retoma en 'say(count)' sin resetear
     assert ("say", 3) in world.calls, world.calls
     print("  OK, contó hasta 3 y el turno 2 leyó el valor del turno 1")
     print("=== memoria entre turnos OK ===\n")

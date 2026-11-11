@@ -85,7 +85,7 @@ class SemanticAnalyzer:
         """Valida que cada goto / if...goto apunte a una etiqueta existente.
 
         Los nodos de salto (Goto, IfGoto) son los unicos con atributo
-        `label`; Label usa `name`. Por eso basta un getattr, sin ramas por
+        `label`, Label usa `name`. Por eso basta un getattr, sin ramas por
         tipo de nodo.
         """
         labels = set(species.blocks)
@@ -105,7 +105,7 @@ class SemanticAnalyzer:
         """Rechaza asignaciones cuyo destino sea de solo lectura (READONLY).
 
         Solo acepta asignar a variables propias: crear una variable nueva
-        (que no existía) está permitido; lo prohibido es pisar una
+        (que no existía) está permitido, lo prohibido es pisar una
         percepción o una constante.
         """
         for block in species.blocks.values():

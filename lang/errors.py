@@ -1,8 +1,8 @@
 class InstinctError(Exception):
     def __init__(self, message, line=None, col=None, filename=None):
-        self.message  = message
-        self.line     = line
-        self.col      = col
+        self.message = message
+        self.line = line
+        self.col = col
         self.filename = filename
         super().__init__(self.format())
 
@@ -32,9 +32,10 @@ class RuntimeFault(InstinctError):
     """Error en tiempo de ejecución (spec 2.8): el bicho muere de un ictus.
 
     Se llama RuntimeFault y no RuntimeError para no pisar el builtin. Lo
-    lanza el intérprete (expresiones y acciones); el simulador lo captura,
+    lanza el intérprete (expresiones y acciones), el simulador lo captura,
     mata a la criatura y escribe el mensaje en los logs.
     """
+
     pass
 
 
@@ -50,6 +51,5 @@ class SemanticErrors(InstinctError):
         super().__init__(self.format())
 
     def format(self):
-        return "errores semánticos:\n  " + "\n  ".join(
-            e.format() for e in self.errors
-        )
+        return "errores semánticos:\n  " + "\n  ".join(e.format() for e in self.errors)
+

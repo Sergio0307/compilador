@@ -118,7 +118,7 @@ def test_attack():
 
 
 def test_objetos_y_regen():
-    """Un objeto agotado desaparece al cerrar el tick; el terreno regenera."""
+    """Un objeto agotado desaparece al cerrar el tick, el terreno regenera."""
     print("=== objetos y regeneración ===")
     w = World(5, 5)
     c = w.add_creature(compilar("wait(1)\n"), 1, 1)
@@ -160,7 +160,7 @@ def test_consume():
 
 def test_reproduce():
     """reproduce (spec 2.4): la madre gasta `health` y debe tener vida de
-    sobra; la cría nace con esa vida exacta y su propio programa."""
+    sobra, la cría nace con esa vida exacta y su propio programa."""
     print("=== reproduce ===")
     w = World(10, 10)
     padre = w.add_creature(compilar(), 5, 5)
@@ -191,7 +191,7 @@ def test_reproduce():
 
 
 def test_vejez():
-    """age +1 por ronda; al llegar a lifespan muere de vejez."""
+    """age +1 por ronda, al llegar a lifespan muere de vejez."""
     print("=== vejez ===")
     w = World(10, 10)
     c = w.add_creature(compilar(lifespan=2), 5, 5)
@@ -205,7 +205,7 @@ def test_vejez():
 
 
 def test_hambre():
-    """Ley natural (spec 3.4): -1 de vida por tick; a 0 muere."""
+    """Ley natural (spec 3.4): -1 de vida por tick, a 0 muere."""
     print("=== hambre ===")
     w = World(10, 10)
     c = w.add_creature(compilar(health=3, lifespan=100), 5, 5)
@@ -227,6 +227,8 @@ def test_ictus():
     w.run_round()
     assert not c.alive, "debía morir de ictus"
     assert "ictus" in c.death_reason and "cero" in c.death_reason
+    assert "(línea " in c.death_reason, c.death_reason
+    assert c.death_reason.rstrip().endswith(")"), c.death_reason
     assert any(e[0] == "muerte" for e in w.log), w.log
     print("  OK:", c.death_reason)
     print("=== ictus OK ===\n")
@@ -294,7 +296,7 @@ def test_percepciones():
 
 
 def test_near():
-    """Conteos y dist/dx/dy en el radio; -1/0/0 cuando no hay nadie."""
+    """Conteos y dist/dx/dy en el radio, -1/0/0 cuando no hay nadie."""
     print("=== percepciones cerca ===")
     w = World(10, 10)
     a = w.add_creature(compilar(vision=3), 5, 5)

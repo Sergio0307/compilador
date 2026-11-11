@@ -1,6 +1,6 @@
 """Carga del contenido del juego: terrenos, objetos, mapas y criaturas.
 
-Los archivos `.te`, `.ob` y `.map` son texto de configuración; los `.ins`
+Los archivos `.te`, `.ob` y `.map` son texto de configuración. los `.ins`
 se compilan con el pipeline del lenguaje. El cargador no lanza excepciones
 por un archivo malo: acumula `LoadError` con archivo y línea, ignora ese
 archivo y sigue con los demás. Así la aplicación puede abrir un proyecto

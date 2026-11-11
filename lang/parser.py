@@ -209,7 +209,7 @@ class Parser:
         Cabecera ('id valor') + cuerpo agrupado en bloques por etiqueta.
         Devuelve un SpeciesDef:
           - nombre/facción y salud/visión/vida se rellenan best-effort
-            ('' o 0 si faltan); la fase de semántica valida y aplica
+            ('' o 0 si faltan), la fase de semántica valida y aplica
             defaults. El campo `header` conserva lo crudo con su línea.
           - 'start:' ausente o primera línea ≠ 'creature': lo detecta
             parse_header. Etiqueta duplicada: ParseError aquí."""
@@ -322,7 +322,7 @@ class Parser:
         return node
 
     def parse_label(self):
-        """name: -> Label. Marca un punto de salto; no consume turno."""
+        """name: -> Label. Marca un punto de salto, no consume turno."""
         name_tok = self.expect(TokenType.IDENT)
         self.expect(TokenType.COLON)
         return Label(name_tok.value, line=name_tok.line)
@@ -477,7 +477,7 @@ class Parser:
         return self.parse_comparison()
 
     def parse_comparison(self):
-        """Comparaciones asociativas por la izquierda; encadenadas estilo Python:
+        """Comparaciones asociativas por la izquierda, encadenadas estilo Python:
         a < b < c  ->  (a < b) and (b < c)"""
         left = self.parse_term()
         if self.peek().type not in COMPARISON_TYPES:
@@ -512,4 +512,3 @@ class Parser:
     def parse_expression(self):
         """Punto de entrada para cualquier expresion."""
         return self.parse_or()
-

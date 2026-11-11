@@ -22,7 +22,7 @@ def _require_numbers(args, line):
 
 
 def _require_directions(dx, dy, line):
-    """dx y dy deben estar en {-1, 0, 1}; si no, error de ejecución."""
+    """dx y dy deben estar en {-1, 0, 1}, si no, error de ejecución."""
     for value in (dx, dy):
         if value not in (-1, 0, 1):
             raise RuntimeFault(
@@ -53,7 +53,7 @@ class Action(ABC):
         return self.consumes_turn
 
     def check(self, ctx, args, line):
-        """Validaciones de runtime comunes; las subclases amplían."""
+        """Validaciones de runtime comunes, las subclases amplían."""
 
     @abstractmethod
     def apply(self, ctx, args, line):
@@ -72,7 +72,7 @@ class Wait(Action):
     def apply(self, ctx, args, line):
         turns = args[0]
         turns = max(turns, 1)
-        # El turno actual ya es uno de los n; el resto se saltan.
+        # El turno actual ya es uno de los n, el resto se saltan.
         ctx.state.waiting = turns - 1
 
 
@@ -133,7 +133,7 @@ class Reproduce(Action):
 
 
 class Roar(Action):
-    """roar(value): emite un rugido; acepta cualquier valor."""
+    """roar(value): emite un rugido, acepta cualquier valor."""
 
     name = "roar"
     arity = 1

@@ -3,6 +3,7 @@
 import unittest
 
 from loaders.resource_manager import ResourceManager
+from world.world import World
 
 
 class TestDotaContent(unittest.TestCase):
@@ -35,6 +36,21 @@ class TestDotaContent(unittest.TestCase):
             (roshan.health, roshan.vision, roshan.lifespan),
             (600, 5, 9999),
         )
+
+    def test_creep_remembers_and_uses_its_lane_anchor(self):
+        world = World(self.manager.maps["Test Field"].build(), seed=1)
+        dire = world.add_creature(self.manager.creatures["DireCreep"], 2, 2)
+
+        world.run_round()
+        self.assertEqual(dire.execution.variables["lane_x"], 2)
+        self.assertEqual(dire.execution.variables["lane_y"], 2)
+
+        # Move it away by hand; the next patrol step should head back west.
+        world.map.move_creature(dire, 7, 4)
+        world.run_round()
+        self.assertEqual((dire.x, dire.y), (6, 4))
+        self.assertEqual(dire.execution.variables["lane_x"], 2)
+        self.assertEqual(dire.execution.variables["lane_y"], 2)
 
 
 if __name__ == "__main__":

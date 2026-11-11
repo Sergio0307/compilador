@@ -58,6 +58,7 @@ class InstinctApp:
         self.map_view = MapView()
         self.world_map = None
         self.world = None
+        self.selected_creature = None
         self.status = ""
         self.status_is_error = False
         self.paused = False
@@ -90,6 +91,7 @@ class InstinctApp:
     def rebuild_map(self):
         self.phase = "preparation"
         self.paused = False
+        self.selected_creature = None
         self.speed_index = 0
         self.ticks_per_second = self.SPEEDS[0]
         self.tick_accumulator = 0.0
@@ -170,6 +172,33 @@ class InstinctApp:
         world.remove_creature(creature)
         self.set_status(f"{species} eliminado de ({cell[0]}, {cell[1]})")
 
+    def inspect_cell(self, position):
+        if self.phase != "playing":
+            return
+        world = self.world
+        world_map = self.world_map
+        if world is None or world_map is None:
+            return
+
+        cell = self.map_view.screen_to_cell(position, world_map, self.MAP_RECT)
+        if cell is None:
+            self.selected_creature = None
+            return
+
+        creature = world.creature_at(cell[0], cell[1])
+        if creature is None:
+            self.selected_creature = None
+            self.set_status(f"Casilla ({cell[0]}, {cell[1]}) sin criatura.")
+            return
+
+        if creature is self.selected_creature:
+            self.selected_creature = None
+            self.set_status("Selección quitada.")
+            return
+
+        self.selected_creature = creature
+        self.set_status(f"Inspeccionando {creature.species} en ({cell[0]}, {cell[1]}).")
+
     def start_game(self):
         if self.phase != "preparation":
             return
@@ -189,7 +218,7 @@ class InstinctApp:
         self.tick_accumulator = 0.0
         self.set_status(
             f"Partida iniciada en {world_map.name}. "
-            f"Corre a {self.ticks_per_second} ticks/s; P pausa."
+            f"Corre a {self.ticks_per_second} ticks/s, P pausa."
         )
 
     def advance_tick(self):
@@ -198,6 +227,8 @@ class InstinctApp:
             return
 
         alive = world.run_round()
+        if self.selected_creature is not None and not self.selected_creature.alive:
+            self.selected_creature = None
         self.set_status(f"Tick {world.tick}: {len(alive)} criaturas vivas.")
 
     def toggle_pause(self):
@@ -207,7 +238,7 @@ class InstinctApp:
         self.paused = not self.paused
         self.tick_accumulator = 0.0
         if self.paused:
-            self.set_status("En pausa. Espacio avanza un tick; P sigue.")
+            self.set_status("En pausa. Espacio avanza un tick, P sigue.")
         else:
             self.set_status("Corriendo de nuevo.")
 
@@ -227,6 +258,8 @@ class InstinctApp:
     @staticmethod
     def format_log_entry(entry):
         kind, tick, name, value = entry
+        if kind == "carga":
+            return f"carga: {value}".replace("\n", " ")
         if kind == "dice":
             body = f"{name} dice: {value}"
         elif kind == "rugido":
@@ -249,6 +282,7 @@ class InstinctApp:
 
     def log_color(self, kind):
         return {
+            "carga": self.ERROR,
             "muerte": self.ERROR,
             "nacimiento": (122, 190, 140),
             "rugido": self.ACCENT,
@@ -270,10 +304,23 @@ class InstinctApp:
             width=1,
             border_radius=8,
         )
-        self.text(self.body_font, "Registro", 115, top + 10, self.TEXT)
-
         max_lines = max(1, (height - 52) // 24)
-        entries = self.world.log[-max_lines:] if self.world is not None else []
+        title = "Registro"
+        if self.load_errors:
+            title = f"Registro · carga: {len(self.load_errors)}"
+        self.text(self.body_font, title, 115, top + 10, self.TEXT)
+
+        load_entries = [
+            ("carga", 0, "", str(error)) for error in self.load_errors
+        ]
+        runtime_entries = self.world.log if self.world is not None else []
+        if len(load_entries) >= max_lines:
+            entries = load_entries[:max_lines]
+        elif load_entries:
+            room = max_lines - len(load_entries)
+            entries = load_entries + runtime_entries[-room:]
+        else:
+            entries = runtime_entries[-max_lines:]
         if not entries:
             self.text(
                 self.small_font,
@@ -299,6 +346,119 @@ class InstinctApp:
                 self.log_color(entry[0]),
             )
             y += 24
+
+    def health_color(self, creature):
+        ratio = max(0.0, min(1.0, creature.health / creature.max_health))
+        if ratio >= 0.6:
+            return (94, 200, 112)
+        if ratio >= 0.3:
+            return (230, 190, 70)
+        return self.ERROR
+
+    @staticmethod
+    def current_label(execution):
+        best = "?"
+        best_index = -1
+        for name, index in execution.program.labels.items():
+            if index <= execution.pc and index > best_index:
+                best = name
+                best_index = index
+        return best
+
+    @staticmethod
+    def current_line(execution):
+        program = execution.program
+        if 0 <= execution.pc < len(program.instructions):
+            return getattr(program.instructions[execution.pc], "line", None)
+        return None
+
+    @staticmethod
+    def format_variables(variables):
+        if not variables:
+            return "(ninguna)"
+        items = list(variables.items())
+        parts = [f"{name}={value}" for name, value in items[:3]]
+        if len(items) > 3:
+            parts.append("…")
+        return "   ".join(parts)
+
+    @staticmethod
+    def format_perceptions(perceptions):
+        if not perceptions:
+            return "(sin turno)"
+        keys = ("enemy_dist", "enemies_near", "reserve_here")
+        return "   ".join(
+            f"{key}={perceptions.get(key, '?')}" for key in keys
+        )
+
+    def draw_inspector(self):
+        self.text(self.heading_font, "Criatura", 1010, 660, self.TEXT)
+
+        creature = self.selected_creature
+        if creature is None:
+            self.text(
+                self.small_font,
+                "Haz clic en una criatura para ver sus datos.",
+                1020,
+                705,
+                self.MUTED,
+            )
+            return
+
+        world_map = self.world_map
+        terrain_name = "?"
+        if world_map is not None:
+            terrain = world_map.terrain_at(creature.x, creature.y)
+            if terrain is not None:
+                terrain_name = terrain.name
+
+        execution = creature.execution
+        line = self.current_line(execution)
+        line_text = "—" if line is None else str(line)
+        label_name = self.current_label(execution)
+
+        rows = [
+            ("Especie", f"{creature.species}  ·  {creature.faction}", self.TEXT),
+            (
+                "Salud",
+                f"{creature.health} / {creature.max_health}   "
+                f"Edad: {creature.age} / {creature.lifespan}",
+                self.health_color(creature),
+            ),
+            (
+                "Posición",
+                f"({creature.x}, {creature.y})   Terreno: {terrain_name}",
+                self.TEXT,
+            ),
+            ("Línea", f"{line_text}   {label_name}", self.TEXT),
+            ("Variables", self.format_variables(execution.variables), self.TEXT),
+            ("Percibe", self.format_perceptions(creature.perceptions), self.TEXT),
+        ]
+        y = 700
+        for label, value, color in rows:
+            self.text(self.small_font, f"{label}:", 1020, y, self.MUTED)
+            value = self.clipped(self.small_font, value, 690)
+            self.text(self.small_font, value, 1120, y, color)
+            y += 24
+
+    def draw_errors(self):
+        self.text(self.heading_font, "Errores de carga", 1010, 680, self.TEXT)
+        y = 720
+        if self.load_errors:
+            for error in self.load_errors[:4]:
+                self.text(self.small_font, str(error)[:110], 1020, y, self.ERROR)
+                y += 24
+            remaining = len(self.load_errors) - 4
+            if remaining > 0:
+                self.text(
+                    self.small_font,
+                    f"... y {remaining} más en Registro.",
+                    1020,
+                    y,
+                    self.MUTED,
+                )
+        else:
+            self.text(self.body_font, "Sin errores.", 1020, y, self.MUTED)
 
     def handle_event(self, event):
         if event.type == pygame.QUIT:
@@ -351,7 +511,7 @@ class InstinctApp:
                             self.set_speed(index)
                             break
                     else:
-                        self.place_creature(event.pos)
+                        self.inspect_cell(event.pos)
                 else:
                     self.place_creature(event.pos)
             elif event.button == 3:
@@ -558,18 +718,15 @@ class InstinctApp:
                 self.screen,
                 world_map,
                 self.MAP_RECT,
+                selected=self.selected_creature,
             )
         else:
             self.text(self.body_font, "No hay mapas cargados.", 1020, 300, self.MUTED)
 
-        self.text(self.heading_font, "Errores de carga", 1010, 680, self.TEXT)
-        y = 720
-        if self.load_errors:
-            for error in self.load_errors[:4]:
-                self.text(self.small_font, str(error)[:110], 1020, y, self.ERROR)
-                y += 24
+        if self.phase == "playing":
+            self.draw_inspector()
         else:
-            self.text(self.body_font, "Sin errores.", 1020, y, self.MUTED)
+            self.draw_errors()
 
         if self.status:
             self.text(
@@ -586,8 +743,8 @@ class InstinctApp:
                 "ESC salir  |  UP/DOWN mapa  |  LEFT/RIGHT especie  |  "
                 "click coloca  |  click derecho quita"
                 if self.phase == "preparation"
-                else "ESC salir  |  1/2/3: velocidad  |  Espacio: un tick  |  "
-                "P: pausa/seguir  |  R: reiniciar"
+                else "ESC salir  |  click: inspeccionar  |  1/2/3: velocidad  |  "
+                "Espacio: un tick  |  P: pausa/seguir  |  R: reiniciar"
             ),
             80,
             1020,
