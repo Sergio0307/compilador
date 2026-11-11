@@ -147,7 +147,7 @@ def test_unary():
 
 
 def test_not():
-    """'not' esta entre 'and' y las comparaciones (estilo Python)."""
+    """'not' comparte nivel con el menos unario (spec 2.5)."""
     print("=== parse_not ===")
     casos = [
         (
@@ -163,9 +163,9 @@ def test_not():
         ("not 0", "UnaryOp(op='not', operand=Number(value=0, line=1), line=1)"),
         (
             "not a < b",
-            "UnaryOp(op='not', operand=BinaryOp(op='<', "
-            "left=Identifier(name='a', line=1), "
-            "right=Identifier(name='b', line=1), line=1), line=1)",
+            "BinaryOp(op='<', left=UnaryOp(op='not', "
+            "operand=Identifier(name='a', line=1), line=1), "
+            "right=Identifier(name='b', line=1), line=1)",
         ),
         (
             "not a and b",
@@ -261,12 +261,22 @@ def test_precedence():
             "BinaryOp(op='and', left=UnaryOp(op='not', operand=Identifier(name='a', line=1), "
             "line=1), right=Identifier(name='b', line=1), line=1)",
         ),
-        # estilo Python: not por debajo de las comparaciones
+        # not comparte nivel con el menos unario, por encima de comparaciones
         (
             "not health < 20",
-            "UnaryOp(op='not', operand=BinaryOp(op='<', "
-            "left=Identifier(name='health', line=1), "
-            "right=Number(value=20, line=1), line=1), line=1)",
+            "BinaryOp(op='<', left=UnaryOp(op='not', "
+            "operand=Identifier(name='health', line=1), line=1), "
+            "right=Number(value=20, line=1), line=1)",
+        ),
+        (
+            "- not x",
+            "UnaryOp(op='-', operand=UnaryOp(op='not', "
+            "operand=Identifier(name='x', line=1), line=1), line=1)",
+        ),
+        (
+            "not -x",
+            "UnaryOp(op='not', operand=UnaryOp(op='-', "
+            "operand=Identifier(name='x', line=1), line=1), line=1)",
         ),
         # comparacion encadenada estilo Python: a <= x < b  ->  (a <= x) and (x < b)
         (

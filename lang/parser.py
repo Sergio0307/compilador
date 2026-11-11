@@ -438,19 +438,24 @@ class Parser:
         return Call(name_tok.value, args, line=name_tok.line)
 
     def parse_unary(self):
-        """Operadores de prefijo: -x. Si no hay ninguno, es primaria.
-        Llama a parse_unary (no a parse_primary) para que se apilen: - - 5."""
+        """Operadores de prefijo: -x y not x, al mismo nivel.
+        Llama a parse_unary (no a parse_primary) para que se apilen:
+        - - 5, not not x, - not x."""
         tok = self.peek()
 
         if tok.type == TokenType.MINUS:
             self.advance()
             return UnaryOp("-", self.parse_unary(), line=tok.line)
+        if tok.type == TokenType.NOT:
+            self.advance()
+            return UnaryOp("not", self.parse_unary(), line=tok.line)
 
         return self.parse_primary()
 
     # Expresiones: cadena de precedencia (de menor a mayor)
-    # or -> and -> not -> comparaciones -> + - -> * / % -> unary -> primary
-    # Estilo Python (spec 2.5): el encadenado a < b < c vale a < b and b < c
+    # or -> and -> comparaciones -> + - -> * / % -> unary -> primary
+    # spec 2.5: menos unario y not comparten nivel, por encima de * / %.
+    # El encadenado a < b < c vale a < b and b < c.
 
     def parse_or(self):
         left = self.parse_and()
@@ -461,20 +466,12 @@ class Parser:
         return left
 
     def parse_and(self):
-        left = self.parse_not()
+        left = self.parse_comparison()
         while self.check(TokenType.AND):
             op = self.advance()
-            right = self.parse_not()
+            right = self.parse_comparison()
             left = BinaryOp("and", left, right, line=op.line)
         return left
-
-    def parse_not(self):
-        """'not' esta entre 'and' y las comparaciones, como en Python:
-        not a < b  ->  not (a < b)"""
-        if self.check(TokenType.NOT):
-            tok = self.advance()
-            return UnaryOp("not", self.parse_not(), line=tok.line)
-        return self.parse_comparison()
 
     def parse_comparison(self):
         """Comparaciones asociativas por la izquierda, encadenadas estilo Python:
