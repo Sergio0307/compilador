@@ -30,6 +30,7 @@ SYMBOLS_1 = {
 # Símbolos de dos caracteres (se comprueban primero)
 SYMBOLS_2 = {
     "==": TokenType.EQ,
+    "!=": TokenType.NEQ,
     "<=": TokenType.LE,
     ">=": TokenType.GE,
 }
@@ -111,7 +112,7 @@ class Lexer:
                 self.read_string()
                 continue
 
-            # '!' solitario sugiere '!='
+            # '!' solo sugiere '!='
             if ch == "!":
                 line, col = self.line, self.col
                 self.advance()
@@ -121,7 +122,8 @@ class Lexer:
                 else:
                     raise LexError(
                         "Carácter inesperado '!'. ¿Quiso decir '!='?",
-                        line=line, col=col, filename=self.filename
+                        line=line, col=col, filename=self.filename,
+                        code="E_LEX_004",
                     )
                 continue
 
@@ -142,7 +144,8 @@ class Lexer:
             # Nada reconocido → error
             raise LexError(
                 f"Carácter inesperado {ch!r}",
-                line=self.line, col=self.col, filename=self.filename
+                line=self.line, col=self.col, filename=self.filename,
+                code="E_LEX_001",
             )
 
         # NEWLINE final (simplifica el parser)
@@ -180,13 +183,15 @@ class Lexer:
             if self.peek() == "\n":
                 raise LexError(
                     "String sin cerrar antes de fin de línea",
-                    line=line, col=col, filename=self.filename
+                    line=line, col=col, filename=self.filename,
+                    code="E_LEX_003",
                 )
             chars.append(self.advance())
         if self.at_end():
             raise LexError(
                 "String sin cerrar",
-                line=line, col=col, filename=self.filename
+                line=line, col=col, filename=self.filename,
+                code="E_LEX_003",
             )
         self.advance()  # consume la comilla de cierre
         self.add(TokenType.STRING, "".join(chars), line, col)
