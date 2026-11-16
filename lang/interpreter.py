@@ -153,15 +153,16 @@ class Interpreter:
         ctx = EvalContext(creature, world, state)
 
         for _ in range(MAX_INSTRUCTIONS):
+            # Wrap al inicio del bucle: si pc está al final, volver a start
+            if state.pc >= len(state.program.instructions):
+                state.pc = state.program.labels.get("start", 0)
             instr = self._fetch(state)
             if self._execute(instr, ctx, state):
                 return
         # Presupuesto agotado sin acción: el turno termina aquí.
 
     def _fetch(self, state):
-        # Al llegar al final del archivo vuelve a 'start:' en el MISMO turno.
-        if state.pc >= len(state.program.instructions):
-            state.pc = state.program.labels.get("start", 0)
+        """Lectura pura: devuelve instrucción en pc actual (sin side-effects)."""
         return state.program.instructions[state.pc]
 
     def _execute(self, instr, ctx, state):
