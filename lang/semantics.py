@@ -15,10 +15,10 @@ class SemanticAnalyzer:
         self.filename = filename
         self.errors = []
 
-    def error(self, message, line=None):
+    def error(self, message, line=None, code=None):
         """Registra un error semántico y sigue analizando."""
         self.errors.append(
-            SemanticError(message, line=line, filename=self.filename)
+            SemanticError(message, line=line, filename=self.filename, code=code)
         )
 
     def analyze(self, species):
@@ -55,10 +55,10 @@ class SemanticAnalyzer:
         vistos = {}   # clave -> (valor, línea)
         for key, value, line in species.header:
             if key not in HEADER_KEYS:
-                self.error(f"clave de cabecera desconocida '{key}'", line=line)
+                self.error(f"clave de cabecera desconocida '{key}'", line=line, code="E_SEM_003")
                 continue
             if key in vistos:
-                self.error(f"clave de cabecera duplicada '{key}'", line=line)
+                self.error(f"clave de cabecera duplicada '{key}'", line=line, code="E_SEM_002")
                 continue
             vistos[key] = (value, line)
 
@@ -66,21 +66,22 @@ class SemanticAnalyzer:
         # en la línea de 'creature' (primera línea de la cabecera).
         for key in HEADER_KEYS:
             if key not in vistos:
-                self.error(f"falta la clave obligatoria '{key}'", line=species.line)
+                self.error(f"falta la clave obligatoria '{key}'", line=species.line, code="E_SEM_001")
 
         # Tipo y rango de cada clave presente
         for key, (value, line) in vistos.items():
             spec = HEADER_KEYS[key]
             if spec["kind"] == "name":
                 if self._is_number(value):
-                    self.error(f"'{key}' debe ser un nombre, no un número", line=line)
+                    self.error(f"'{key}' debe ser un nombre, no un número", line=line, code="E_SEM_004")
             else:   # "int"
                 if not self._is_number(value):
-                    self.error(f"'{key}' debe ser un número entero", line=line)
+                    self.error(f"'{key}' debe ser un número entero", line=line, code="E_SEM_004")
                 elif int(value) < spec["min"]:
                     self.error(
                         f"'{key}' debe ser >= {spec['min']} (se encontró {value})",
                         line=line,
+                        code="E_SEM_005",
                     )
 
 
@@ -103,6 +104,7 @@ class SemanticAnalyzer:
                         f"en el bloque '{block.label}': goto a etiqueta "
                         f"inexistente '{destino}'",
                         line=instr.line,
+                        code="E_SEM_005",
                     )
 
 
@@ -123,6 +125,7 @@ class SemanticAnalyzer:
                     self.error(
                         f"no se puede asignar a la {tipo} '{instr.name}'",
                         line=instr.line,
+                        code="E_SEM_006",
                     )
 
 
@@ -168,14 +171,16 @@ class SemanticAnalyzer:
                     f"la acción '{call.name}' espera {esperados} argumentos, "
                     f"se encontraron {len(call.args)}",
                     line=call.line,
+                    code="E_SEM_007",
                 )
         elif call.name in FUNCTIONS:
             self.error(
                 f"'{call.name}' es una función: no se puede usar como instrucción",
                 line=call.line,
+                code="E_SEM_008",
             )
         else:
-            self.error(f"acción desconocida '{call.name}'", line=call.line)
+            self.error(f"acción desconocida '{call.name}'", line=call.line, code="E_SEM_009")
 
     def _check_function(self, call):
         """Una función debe existir en FUNCTIONS y traer su aridad exacta."""
@@ -186,12 +191,14 @@ class SemanticAnalyzer:
                     f"la función '{call.name}' espera {esperados} argumentos, "
                     f"se encontraron {len(call.args)}",
                     line=call.line,
+                    code="E_SEM_007",
                 )
         elif call.name in ACTIONS:
             self.error(
                 f"'{call.name}' es una acción: no se puede llamar dentro de "
                 f"una expresión",
                 line=call.line,
+                code="E_SEM_008",
             )
         else:
-            self.error(f"función desconocida '{call.name}'", line=call.line)
+            self.error(f"función desconocida '{call.name}'", line=call.line, code="E_SEM_009")
