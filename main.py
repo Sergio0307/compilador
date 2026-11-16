@@ -50,6 +50,17 @@ def main(argv=None):
                         help="semilla del RNG para reproducción exacta")
     args = parser.parse_args(argv)
 
+    # 4.2: Validar argumentos CLI - deben ser >= 1
+    if args.ticks < 1:
+        print(f"error: --ticks debe ser >= 1 (se recibió {args.ticks})", file=sys.stderr)
+        raise SystemExit(1)
+    if args.width < 1:
+        print(f"error: --width debe ser >= 1 (se recibió {args.width})", file=sys.stderr)
+        raise SystemExit(1)
+    if args.height < 1:
+        print(f"error: --height debe ser >= 1 (se recibió {args.height})", file=sys.stderr)
+        raise SystemExit(1)
+
     # Compila TODO antes de simular: un .ins roto corta aquí, sin gastar rondas
     species = [(path, cargar(path)) for path in args.files]
 
