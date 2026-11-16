@@ -60,18 +60,20 @@ class Action(ABC):
 
 
 class Wait(Action):
-    """wait(n): no hace nada durante n turnos seguidos (n < 1 cuenta como 1)."""
+    """wait(n): no hace nada durante n turnos seguidos (n >= 1)."""
     name = "wait"
     arity = 1
 
     def check(self, ctx, args, line=None, col=None, filename=None):
         _require_numbers(args, line=line, col=col, filename=filename)
+        if args[0] < 1:
+            raise RuntimeFault(
+                "wait espera n >= 1",
+                line=line, col=col, filename=filename,
+            )
 
     def apply(self, ctx, args, line=None, col=None, filename=None):
-        turns = args[0]
-        if turns < 1:
-            turns = 1
-        # El turno actual ya es uno de los n; el resto se saltan.
+        turns = args[0]  # Ya validado >= 1
         ctx.state.waiting = turns - 1
 
 
