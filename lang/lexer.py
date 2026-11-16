@@ -30,7 +30,6 @@ SYMBOLS_1 = {
 # Símbolos de dos caracteres (se comprueban primero)
 SYMBOLS_2 = {
     "==": TokenType.EQ,
-    "!=": TokenType.NEQ,
     "<=": TokenType.LE,
     ">=": TokenType.GE,
 }
@@ -38,6 +37,8 @@ SYMBOLS_2 = {
 
 class Lexer:
     def __init__(self, source: str, filename: str = "<input>"):
+        if not isinstance(source, str):
+            raise TypeError(f"source debe ser str, no {type(source).__name__}")
         self.src      = source
         self.filename = filename
         self.pos      = 0
@@ -49,6 +50,8 @@ class Lexer:
 
     def peek(self, offset: int = 0) -> str:
         """Carácter actual (o el que está a `offset`), sin consumir."""
+        if offset < 0:
+            raise ValueError("offset no puede ser negativo")
         i = self.pos + offset
         return self.src[i] if i < len(self.src) else ""
 
@@ -90,11 +93,11 @@ class Lexer:
             if ch == "\n":
                 line, col = self.line, self.col
                 self.advance()
-                self.add(TokenType.NEWLINE, "\\n", line, col)
+                self.add(TokenType.NEWLINE, "", line, col)
                 continue
 
             # Número
-            if ch.isdigit():
+            if '0' <= ch <= '9':
                 self.read_number()
                 continue
 
@@ -106,6 +109,20 @@ class Lexer:
             # String
             if ch == '"':
                 self.read_string()
+                continue
+
+            # '!' solitario sugiere '!='
+            if ch == "!":
+                line, col = self.line, self.col
+                self.advance()
+                if self.peek() == "=":
+                    self.advance()
+                    self.add(TokenType.NEQ, "!=", line, col)
+                else:
+                    raise LexError(
+                        "Carácter inesperado '!'. ¿Quiso decir '!='?",
+                        line=line, col=col, filename=self.filename
+                    )
                 continue
 
             # Símbolos (primero los de 2 chars)
@@ -128,9 +145,9 @@ class Lexer:
                 line=self.line, col=self.col, filename=self.filename
             )
 
-        #NEWLINE final (simplifica el parser)
+        # NEWLINE final (simplifica el parser)
         if self.tokens and self.tokens[-1].type != TokenType.NEWLINE:
-            self.add(TokenType.NEWLINE, "\\n", self.line, self.col)
+            self.add(TokenType.NEWLINE, "", self.line, self.col)
 
         self.add(TokenType.EOF, "", self.line, self.col)
         return self.tokens
@@ -138,11 +155,12 @@ class Lexer:
     # ---------- lectores ----------
 
     def read_number(self):
+        """Solo dígitos ASCII '0'-'9'."""
         line, col = self.line, self.col
         start = self.pos
-        while not self.at_end() and self.peek().isdigit():
+        while not self.at_end() and '0' <= self.peek() <= '9':
             self.advance()
-        # para decimales se añade '.')
+        # Para decimales se añade '.' en futuro
         self.add(TokenType.NUMBER, self.src[start:self.pos], line, col)
 
     def read_ident(self):
