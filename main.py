@@ -58,7 +58,7 @@ def main(argv=None):
         cells = world.free_cells()
         if not cells:
             print("error: no hay casillas libres para nacer", file=sys.stderr)
-            return 1
+            raise SystemExit(1)
         x, y = cells[world.random.randrange(len(cells))]
         world.add_creature(sp, x, y)
         print(f"{path}: {sp.name} ({sp.faction}) nace en ({x}, {y})")
@@ -78,7 +78,7 @@ def main(argv=None):
     for c in world.creatures:
         if not c.alive:
             print(f"  {c.species} murió: {c.death_reason}")
-    return 0
+    raise SystemExit(0)
 
 
 if __name__ == "__main__":
