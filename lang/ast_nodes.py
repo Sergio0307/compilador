@@ -11,6 +11,8 @@ class SpeciesDef:
     blocks: dict                # {"start": Block, "wander": Block, ...}
     header: list                # [(clave, valor, línea), ...] crudo: lo valida la fase 3
     line: int = 0               # línea donde aparece 'creature'
+    col: int = 0                # columna donde aparece 'creature'
+    filename: str = ""          # nombre del archivo fuente
 
 
 @dataclass
@@ -18,7 +20,6 @@ class Block:
     """Un bloque de comportamiento, encabezado por una etiqueta."""
     label: str                  # "start", "wander", "bite", ...
     instructions: list          # [IfGoto, Goto, Call, ...]
-
 
 
 # Instrucciones
@@ -29,6 +30,7 @@ class Label:
     """name: — marca un punto al que se puede saltar. No consume turno."""
     name: str                   # "wander", "bite", "start", ...
     line: int = 0               # línea donde aparece la etiqueta
+    col: int = 0                # columna donde aparece la etiqueta
 
 
 @dataclass
@@ -37,6 +39,7 @@ class IfGoto:
     condition: object           # nodo de expresión
     label: str                  # "flee"
     line: int = 0
+    col: int = 0
 
 
 @dataclass
@@ -44,6 +47,7 @@ class Goto:
     """goto LABEL"""
     label: str                  # "start"
     line: int = 0
+    col: int = 0
 
 
 @dataclass
@@ -52,6 +56,7 @@ class Call:
     name: str                   # "move", "say", "consume", ...
     args: list                  # [expr, expr, ...]
     line: int = 0
+    col: int = 0
 
     def evaluate(self, ctx):
         """Dentro de una expresión, un Call es una función reservada
@@ -62,6 +67,7 @@ class Call:
             self.name,
             [arg.evaluate(ctx) for arg in self.args],
             self.line,
+            self.col,
         )
 
 
@@ -71,7 +77,7 @@ class Assign:
     name: str                   # "home_x"
     expr: object                # nodo de expresión
     line: int = 0               # línea del '='
-
+    col: int = 0                # columna del '='
 
 
 # Expresiones
@@ -82,6 +88,7 @@ class Number:
     """80, 6, 400, 15..."""
     value: int
     line: int = 0               # línea donde aparece el literal
+    col: int = 0                # columna donde aparece el literal
 
     def evaluate(self, ctx):
         """Un literal entero se evalúa a sí mismo."""
@@ -93,6 +100,7 @@ class String:
     """"meat is back on the menu" (sin las comillas)"""
     value: str
     line: int = 0               # línea donde aparece el literal
+    col: int = 0                # columna donde aparece el literal
 
     def evaluate(self, ctx):
         """Un literal de texto se evalúa a sí mismo."""
@@ -104,10 +112,11 @@ class Identifier:
     """health, enemy_dist, GROUND, random, start..."""
     name: str
     line: int = 0               # línea donde aparece el identificador
+    col: int = 0                # columna donde aparece el identificador
 
     def evaluate(self, ctx):
         """Variable propia, percepción o constante: lo resuelve el contexto."""
-        return ctx.resolve(self.name, self.line)
+        return ctx.resolve(self.name, self.line, self.col)
 
 
 @dataclass
@@ -117,6 +126,7 @@ class BinaryOp:
     left: object                # nodo de expresión
     right: object               # nodo de expresión
     line: int = 0               # línea del operador
+    col: int = 0                # columna del operador
 
     def evaluate(self, ctx):
         """Evalúa ambos lados y aplica el operador (reglas en values.py)."""
@@ -125,6 +135,7 @@ class BinaryOp:
             self.left.evaluate(ctx),
             self.right.evaluate(ctx),
             self.line,
+            self.col,
         )
 
 
@@ -134,9 +145,8 @@ class UnaryOp:
     op: str                     # "-", "not"
     operand: object             # nodo de expresión
     line: int = 0               # línea del operador
+    col: int = 0                # columna del operador
 
     def evaluate(self, ctx):
         """Evalúa el operando y aplica el operador unario."""
-        return ctx.unary(self.op, self.operand.evaluate(ctx), self.line)
-
-
+        return ctx.unary(self.op, self.operand.evaluate(ctx), self.line, self.col)

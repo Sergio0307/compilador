@@ -22,6 +22,10 @@ class FakeCreature:
 
     def __init__(self):
         self.execution = None
+        # Para EvalContext.filename
+        class _SpeciesDef:
+            filename = "test.ins"
+        self.species_def = _SpeciesDef()
 
 
 class FakeWorld:

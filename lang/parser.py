@@ -238,6 +238,8 @@ class Parser:
             blocks=blocks,
             header=entries,
             line=line,
+            col=0,
+            filename=self.filename,
         )
 
 
@@ -295,13 +297,13 @@ class Parser:
         """name: -> Label. Marca un punto de salto; no consume turno."""
         name_tok = self.expect(TokenType.IDENT)
         self.expect(TokenType.COLON)
-        return Label(name_tok.value, line=name_tok.line)
+        return Label(name_tok.value, line=name_tok.line, col=name_tok.col)
 
     def parse_goto(self):
         """goto name -> Goto. (Que la etiqueta exista: fase 3.)"""
         gt = self.expect(TokenType.GOTO)
         name_tok = self._expect_label_name()
-        return Goto(name_tok.value, line=gt.line)
+        return Goto(name_tok.value, line=gt.line, col=gt.col)
 
     def parse_if_goto(self):
         """if expr goto name -> IfGoto. La expresión se detiene sola en 'goto'
@@ -317,7 +319,7 @@ class Parser:
             )
         self.advance()
         name_tok = self._expect_label_name()
-        return IfGoto(cond, name_tok.value, line=if_tok.line)
+        return IfGoto(cond, name_tok.value, line=if_tok.line, col=if_tok.col)
 
     def parse_action(self):
         """action(arg, ...) sola en su línea -> Call.
@@ -350,7 +352,7 @@ class Parser:
                 "asignaciones encadenadas no permitidas (x = y = ...)",
                 line=tok.line, col=tok.col, filename=self.filename,
             )
-        return Assign(name_tok.value, expr, line=eq.line)
+        return Assign(name_tok.value, expr, line=eq.line, col=eq.col)
 
 
     # Expresiones: nivel primario (atomos)
@@ -363,12 +365,12 @@ class Parser:
         # Numero
         if tok.type == TokenType.NUMBER:
             self.advance()
-            return Number(int(tok.value), line=tok.line)
+            return Number(int(tok.value), line=tok.line, col=tok.col)
 
         # String
         if tok.type == TokenType.STRING:
             self.advance()
-            return String(tok.value, line=tok.line)
+            return String(tok.value, line=tok.line, col=tok.col)
 
         # Identificador: variable, percepcion o funcion (see, name, ...).
         # Un identificador seguido de '(' es una llamada: see(x, y), name(x, y)
@@ -376,7 +378,7 @@ class Parser:
             self.advance()
             if self.match(TokenType.LPAREN):
                 return self.parse_call_args(tok)
-            return Identifier(tok.value, line=tok.line)
+            return Identifier(tok.value, line=tok.line, col=tok.col)
 
         # Parentesis: (expr)
         if tok.type == TokenType.LPAREN:
@@ -400,7 +402,7 @@ class Parser:
             while self.match(TokenType.COMMA):
                 args.append(self.parse_expression())
         self.expect(TokenType.RPAREN)
-        return Call(name_tok.value, args, line=name_tok.line)
+        return Call(name_tok.value, args, line=name_tok.line, col=name_tok.col)
 
     def parse_unary(self):
         """Operadores de prefijo: -x. Si no hay ninguno, es primaria.
@@ -409,7 +411,7 @@ class Parser:
 
         if tok.type == TokenType.MINUS:
             self.advance()
-            return UnaryOp("-", self.parse_unary(), line=tok.line)
+            return UnaryOp("-", self.parse_unary(), line=tok.line, col=tok.col)
 
         return self.parse_primary()
 
@@ -422,7 +424,7 @@ class Parser:
         while self.check(TokenType.OR):
             op = self.advance()
             right = self.parse_and()
-            left = BinaryOp("or", left, right, line=op.line)
+            left = BinaryOp("or", left, right, line=op.line, col=op.col)
         return left
 
     def parse_and(self):
@@ -430,7 +432,7 @@ class Parser:
         while self.check(TokenType.AND):
             op = self.advance()
             right = self.parse_not()
-            left = BinaryOp("and", left, right, line=op.line)
+            left = BinaryOp("and", left, right, line=op.line, col=op.col)
         return left
 
     def parse_not(self):
@@ -438,7 +440,7 @@ class Parser:
            not a < b  ->  not (a < b)"""
         if self.check(TokenType.NOT):
             tok = self.advance()
-            return UnaryOp("not", self.parse_not(), line=tok.line)
+            return UnaryOp("not", self.parse_not(), line=tok.line, col=tok.col)
         return self.parse_comparison()
 
     def parse_comparison(self):
@@ -451,9 +453,9 @@ class Parser:
         while self.peek().type in COMPARISON_TYPES:
             op = self.advance()
             right = self.parse_term()
-            cmp = BinaryOp(op.value, left, right, line=op.line)
+            cmp = BinaryOp(op.value, left, right, line=op.line, col=op.col)
             result = cmp if result is None else \
-                BinaryOp("and", result, cmp, line=op.line)
+                BinaryOp("and", result, cmp, line=op.line, col=op.col)
             left = right
         return result
 
@@ -462,7 +464,7 @@ class Parser:
         while self.peek().type in (TokenType.PLUS, TokenType.MINUS):
             op = self.advance()
             right = self.parse_factor()
-            left = BinaryOp(op.value, left, right, line=op.line)
+            left = BinaryOp(op.value, left, right, line=op.line, col=op.col)
         return left
 
     def parse_factor(self):
@@ -470,7 +472,7 @@ class Parser:
         while self.peek().type in (TokenType.STAR, TokenType.SLASH, TokenType.PERCENT):
             op = self.advance()
             right = self.parse_unary()
-            left = BinaryOp(op.value, left, right, line=op.line)
+            left = BinaryOp(op.value, left, right, line=op.line, col=op.col)
         return left
 
     def parse_expression(self):

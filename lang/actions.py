@@ -15,19 +15,19 @@ from lang.errors import RuntimeFault
 from lang.values import require_numbers
 
 
-def _require_numbers(args, line=None, context=""):
+def _require_numbers(args, line=None, col=None, filename=None, context=""):
     """Valida que todos los args sean números (delegado a values.require_numbers)."""
-    require_numbers(args, line=line, context=context)
+    require_numbers(args, line=line, col=col, filename=filename, context=context)
 
 
-def _require_directions(dx, dy, line=None, context=""):
+def _require_directions(dx, dy, line=None, col=None, filename=None, context=""):
     """Valida que dx, dy sean números y estén en {-1, 0, 1}."""
-    _require_numbers([dx, dy], line=line, context=context)
+    _require_numbers([dx, dy], line=line, col=col, filename=filename, context=context)
     for value, name in ((dx, "dx"), (dy, "dy")):
         if value not in (-1, 0, 1):
             raise RuntimeFault(
                 f"dirección fuera de rango ({value}): {name} debe estar en {{-1, 0, 1}}",
-                line=line,
+                line=line, col=col, filename=filename,
             )
 
 
@@ -38,24 +38,24 @@ class Action(ABC):
     arity = 0
     consumes_turn = True
 
-    def execute(self, ctx, args, line=None):
+    def execute(self, ctx, args, line=None, col=None, filename=None):
         """Valida la aridad y los argumentos, aplica el efecto y dice si
         consume el turno. `ctx` da acceso a criatura, mundo y estado."""
         if len(args) != self.arity:
             raise RuntimeFault(
                 f"la acción '{self.name}' espera {self.arity} argumentos, "
                 f"se encontraron {len(args)}",
-                line=line,
+                line=line, col=col, filename=filename,
             )
-        self.check(ctx, args, line)
-        self.apply(ctx, args, line)
+        self.check(ctx, args, line, col, filename)
+        self.apply(ctx, args, line, col, filename)
         return self.consumes_turn
 
-    def check(self, ctx, args, line):
+    def check(self, ctx, args, line=None, col=None, filename=None):
         """Validaciones de runtime comunes; las subclases amplían."""
 
     @abstractmethod
-    def apply(self, ctx, args, line):
+    def apply(self, ctx, args, line=None, col=None, filename=None):
         """Aplica el efecto de la acción sobre el mundo."""
 
 
@@ -64,10 +64,10 @@ class Wait(Action):
     name = "wait"
     arity = 1
 
-    def check(self, ctx, args, line):
-        _require_numbers(args, line)
+    def check(self, ctx, args, line=None, col=None, filename=None):
+        _require_numbers(args, line=line, col=col, filename=filename)
 
-    def apply(self, ctx, args, line):
+    def apply(self, ctx, args, line=None, col=None, filename=None):
         turns = args[0]
         if turns < 1:
             turns = 1
@@ -80,11 +80,11 @@ class Move(Action):
     name = "move"
     arity = 3
 
-    def check(self, ctx, args, line):
-        _require_numbers(args, line)
-        _require_directions(args[0], args[1], line)
+    def check(self, ctx, args, line=None, col=None, filename=None):
+        _require_numbers(args, line=line, col=col, filename=filename)
+        _require_directions(args[0], args[1], line=line, col=col, filename=filename)
 
-    def apply(self, ctx, args, line):
+    def apply(self, ctx, args, line=None, col=None, filename=None):
         ctx.world.move(ctx.creature, *args)
 
 
@@ -93,11 +93,11 @@ class Attack(Action):
     name = "attack"
     arity = 3
 
-    def check(self, ctx, args, line):
-        _require_numbers(args, line)
-        _require_directions(args[0], args[1], line)
+    def check(self, ctx, args, line=None, col=None, filename=None):
+        _require_numbers(args, line=line, col=col, filename=filename)
+        _require_directions(args[0], args[1], line=line, col=col, filename=filename)
 
-    def apply(self, ctx, args, line):
+    def apply(self, ctx, args, line=None, col=None, filename=None):
         ctx.world.attack(ctx.creature, *args)
 
 
@@ -106,11 +106,11 @@ class Consume(Action):
     name = "consume"
     arity = 4
 
-    def check(self, ctx, args, line):
-        _require_numbers(args, line)
-        _require_directions(args[0], args[1], line)
+    def check(self, ctx, args, line=None, col=None, filename=None):
+        _require_numbers(args, line=line, col=col, filename=filename)
+        _require_directions(args[0], args[1], line=line, col=col, filename=filename)
 
-    def apply(self, ctx, args, line):
+    def apply(self, ctx, args, line=None, col=None, filename=None):
         ctx.world.consume(ctx.creature, *args)
 
 
@@ -119,11 +119,11 @@ class Reproduce(Action):
     name = "reproduce"
     arity = 3
 
-    def check(self, ctx, args, line):
-        _require_numbers(args, line)
-        _require_directions(args[0], args[1], line)
+    def check(self, ctx, args, line=None, col=None, filename=None):
+        _require_numbers(args, line=line, col=col, filename=filename)
+        _require_directions(args[0], args[1], line=line, col=col, filename=filename)
 
-    def apply(self, ctx, args, line):
+    def apply(self, ctx, args, line=None, col=None, filename=None):
         ctx.world.reproduce(ctx.creature, *args)
 
 
@@ -132,7 +132,7 @@ class Roar(Action):
     name = "roar"
     arity = 1
 
-    def apply(self, ctx, args, line):
+    def apply(self, ctx, args, line=None, col=None, filename=None):
         ctx.world.roar(ctx.creature, args[0])
 
 
@@ -142,10 +142,10 @@ class Say(Action):
     arity = 1
     consumes_turn = False
 
-    def apply(self, ctx, args, line):
+    def apply(self, ctx, args, line=None, col=None, filename=None):
         ctx.world.say(ctx.creature, args[0])
 
 
 # Registro para el despacho del intérprete: nombre -> instancia.
 ACTION_BY_NAME = {a.name: a for a in (Wait(), Move(), Attack(), Consume(),
-                                      Reproduce(), Roar(), Say())}
+                                       Reproduce(), Roar(), Say())}

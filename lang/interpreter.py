@@ -30,20 +30,20 @@ MAX_INSTRUCTIONS = 100   # spec 2.7
 # Funciones reservadas (spec 2.6)
 # --------------------------------------------------------------------------
 
-def _require_coords(fname, x, y, line=None):
+def _require_coords(fname, x, y, line=None, col=None, filename=None):
     """see()/name() esperan coordenadas numéricas, no texto."""
-    require_numbers([x, y], line=line, context=fname)
+    require_numbers([x, y], line=line, col=col, filename=filename, context=fname)
 
 
-def _see(ctx, args, line):
+def _see(ctx, args, line=None, col=None, filename=None):
     x, y = args
-    _require_coords("see", x, y, line)
+    _require_coords("see", x, y, line, col, filename)
     return ctx.world.see(ctx.creature, x, y)
 
 
-def _name(ctx, args, line):
+def _name(ctx, args, line=None, col=None, filename=None):
     x, y = args
-    _require_coords("name", x, y, line)
+    _require_coords("name", x, y, line, col, filename)
     return ctx.world.name_at(ctx.creature, x, y)
 
 
@@ -98,8 +98,9 @@ class EvalContext:
         self.creature = creature
         self.world = world
         self.state = state
+        self.filename = getattr(creature.species_def, 'filename', '<unknown>')
 
-    def resolve(self, name, line=None):
+    def resolve(self, name, line=None, col=None):
         """Variable propia -> constante -> percepción; si no, error."""
         if name in self.state.variables:
             return self.state.variables[name]
@@ -108,20 +109,20 @@ class EvalContext:
         if name in PERCEPTIONS:
             return self.world.perception(self.creature, name)
         raise RuntimeFault(
-            f"variable '{name}' leída antes de asignarse", line=line
+            f"variable '{name}' leída antes de asignarse", line=line, col=col, filename=self.filename
         )
 
-    def binary(self, op, a, b, line=None):
-        return binary(op, a, b, line)
+    def binary(self, op, a, b, line=None, col=None):
+        return binary(op, a, b, line, col, self.filename)
 
-    def unary(self, op, value, line=None):
-        return unary(op, value, line)
+    def unary(self, op, value, line=None, col=None):
+        return unary(op, value, line, col, self.filename)
 
-    def call_function(self, name, arg_values, line=None):
+    def call_function(self, name, arg_values, line=None, col=None):
         impl = FUNCTION_BY_NAME.get(name)
         if impl is None:
-            raise RuntimeFault(f"función desconocida '{name}'", line=line)
-        return impl(self, arg_values, line)
+            raise RuntimeFault(f"función desconocida '{name}'", line=line, col=col, filename=self.filename)
+        return impl(self, arg_values, line, col, self.filename)
 
 
 # --------------------------------------------------------------------------
@@ -169,6 +170,8 @@ class Interpreter:
             raise RuntimeFault(
                 f"instrucción desconocida: {instr!r}",
                 line=getattr(instr, "line", None),
+                col=getattr(instr, "col", None),
+                filename=ctx.filename,
             )
         return handler(instr, ctx, state)
 
@@ -195,8 +198,11 @@ class Interpreter:
         action = self.actions.get(instr.name)
         if action is None:
             raise RuntimeFault(
-                f"acción desconocida '{instr.name}'", line=instr.line
+                f"acción desconocida '{instr.name}'",
+                line=instr.line,
+                col=instr.col,
+                filename=ctx.filename,
             )
-        consumes = action.execute(ctx, args, instr.line)
+        consumes = action.execute(ctx, args, instr.line, instr.col, ctx.filename)
         state.pc += 1
         return consumes
