@@ -179,12 +179,30 @@ class Interpreter:
     # Manejadores: devuelven True si consumen el turno.
 
     def _do_goto(self, instr, ctx, state):
-        state.pc = state.program.labels[instr.label]
+        target = state.program.labels.get(instr.label)
+        if target is None:
+            raise RuntimeFault(
+                f"etiqueta inexistente '{instr.label}' en goto",
+                line=instr.line,
+                col=instr.col,
+                filename=ctx.filename,
+                code="E_RUN_003",
+            )
+        state.pc = target
         return False
 
     def _do_if(self, instr, ctx, state):
         if is_truthy(instr.condition.evaluate(ctx)):
-            state.pc = state.program.labels[instr.label]
+            target = state.program.labels.get(instr.label)
+            if target is None:
+                raise RuntimeFault(
+                    f"etiqueta inexistente '{instr.label}' en if-goto",
+                    line=instr.line,
+                    col=instr.col,
+                    filename=ctx.filename,
+                    code="E_RUN_003",
+                )
+            state.pc = target
         else:
             state.pc += 1
         return False
