@@ -1,9 +1,10 @@
 class InstinctError(Exception):
-    def __init__(self, message, line=None, col=None, filename=None):
+    def __init__(self, message, line=None, col=None, filename=None, code=None):
         self.message  = message
         self.line     = line
         self.col      = col
         self.filename = filename
+        self.code     = code  # NUEVO: código de error (ej. "E_LEX_001")
         super().__init__(self.format())
 
     def format(self):
@@ -13,18 +14,22 @@ class InstinctError(Exception):
             if self.col is not None:
                 loc += f":{self.col}"
             loc += ")"
-        return f"{self.message}{loc}"
+        code_str = f" [{self.code}]" if self.code else ""
+        return f"{self.message}{code_str}{loc}"
 
 
 class LexError(InstinctError):
+    """Error léxico: carácter inesperado, número inválido, string sin cerrar, etc."""
     pass
 
 
 class ParseError(InstinctError):
+    """Error sintáctico: estructura inválida, token inesperado, etc."""
     pass
 
 
 class SemanticError(InstinctError):
+    """Error semántico: clave faltante, goto inválido, asignación prohibida, etc."""
     pass
 
 
@@ -47,9 +52,11 @@ class SemanticErrors(InstinctError):
 
     def __init__(self, errors):
         self.errors = list(errors)
-        super().__init__(self.format())
+        # code genérico para grupo
+        super().__init__("errores semánticos", code="E_SEM_MULTIPLE")
 
     def format(self):
-        return "errores semánticos:\n  " + "\n  ".join(
+        code_str = f" [{self.code}]" if self.code else ""
+        return f"errores semánticos{code_str}:\n  " + "\n  ".join(
             e.format() for e in self.errors
         )
