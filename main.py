@@ -68,12 +68,15 @@ def main(argv=None):
     species = [(path, cargar(path)) for path in args.files]
 
     world = World(args.width, args.height, seed=args.seed)
+
+    # 4.4: Calcular celdas libres una vez y actualizar incrementalmente
+    free_cells = set(world.free_cells())
+
     for path, sp in species:
-        cells = world.free_cells()
-        if not cells:
+        if not free_cells:
             print("error: no hay casillas libres para nacer", file=sys.stderr)
             raise SystemExit(1)
-        x, y = cells[world.random.randrange(len(cells))]
+        x, y = free_cells.pop()  # Elige y elimina de una vez
         world.add_creature(sp, x, y)
         print(f"{path}: {sp.name} ({sp.faction}) nace en ({x}, {y})")
 
