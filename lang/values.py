@@ -34,26 +34,35 @@ def type_name(value):
     return "texto" if isinstance(value, str) else "número"
 
 
-def _check_same_type(op, a, b, line, col, filename):
+def _check_same_type(op, a, b, line=None, col=None, filename=None):
     """Todos los operadores salvo los lógicos exigen el mismo tipo a los dos
     lados (spec 2.5); si no, error en tiempo de ejecución."""
     if type(a) is not type(b):
         raise RuntimeFault(
             f"no se puede aplicar '{op}' a {type_name(a)} y {type_name(b)}",
             line=line, col=col, filename=filename,
+            code="E_RUN_004",
         )
 
 
-def _check_number(op, value, line, col, filename):
+def _check_number(op, value, line=None, col=None, filename=None):
     """La aritmética y las comparaciones de orden solo aceptan números."""
     if isinstance(value, str):
-        raise RuntimeFault(f"el operador '{op}' no admite texto", line=line, col=col, filename=filename)
+        raise RuntimeFault(
+            f"el operador '{op}' no admite texto",
+            line=line, col=col, filename=filename,
+            code="E_RUN_004",
+        )
 
 
-def _reject_zero(divisor, line, col, filename):
+def _reject_zero(divisor, line=None, col=None, filename=None):
     """La división y el resto rechazan el divisor 0 (spec 2.8)."""
     if divisor == 0:
-        raise RuntimeFault("división por cero", line=line, col=col, filename=filename)
+        raise RuntimeFault(
+            "división por cero",
+            line=line, col=col, filename=filename,
+            code="E_RUN_001",
+        )
 
 
 def require_numbers(args, line=None, col=None, filename=None, context=""):
@@ -73,6 +82,7 @@ def require_numbers(args, line=None, col=None, filename=None, context=""):
             raise RuntimeFault(
                 f"se esperaba un número{ctx}, se recibió texto",
                 line=line, col=col, filename=filename,
+                code="E_RUN_004",
             )
 
 
@@ -91,7 +101,12 @@ class BinaryOperator(ABC):
 
     def check(self, a, b, line=None, col=None, filename=None):
         """Por defecto, mismo tipo a los dos lados; las categorías afinan."""
-        _check_same_type(self.symbol, a, b, line, col, filename)
+        if type(a) is not type(b):
+            raise RuntimeFault(
+                f"no se puede aplicar '{self.symbol}' a {type_name(a)} y {type_name(b)}",
+                line=line, col=col, filename=filename,
+                code="E_RUN_004",
+            )
 
     @abstractmethod
     def apply(self, a, b):
@@ -248,7 +263,12 @@ class Neg(UnaryOperator):
     symbol = "-"
 
     def check(self, value, line=None, col=None, filename=None):
-        _check_number(self.symbol, value, line, col, filename)
+        if isinstance(value, str):
+            raise RuntimeFault(
+                f"el operador '-' no admite texto",
+                line=line, col=col, filename=filename,
+                code="E_RUN_004",
+            )
 
     def apply(self, value):
         return -value
@@ -277,7 +297,11 @@ def binary(op, a, b, line=None, col=None, filename=None):
     """Aplica un operador binario a dos valores ya evaluados."""
     operator = BINARY_OPERATORS.get(op)
     if operator is None:
-        raise RuntimeFault(f"operador desconocido '{op}'", line=line, col=col, filename=filename)
+        raise RuntimeFault(
+            f"operador desconocido '{op}'",
+            line=line, col=col, filename=filename,
+            code="E_RUN_006",
+        )
     return operator(a, b, line, col, filename)
 
 
@@ -285,5 +309,9 @@ def unary(op, value, line=None, col=None, filename=None):
     """Aplica un operador unario: '-x' y 'not x'."""
     operator = UNARY_OPERATORS.get(op)
     if operator is None:
-        raise RuntimeFault(f"operador unario desconocido '{op}'", line=line, col=col, filename=filename)
+        raise RuntimeFault(
+            f"operador unario desconocido '{op}'",
+            line=line, col=col, filename=filename,
+            code="E_RUN_006",
+        )
     return operator(value, line, col, filename)

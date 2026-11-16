@@ -28,6 +28,7 @@ def _require_directions(dx, dy, line=None, col=None, filename=None, context=""):
             raise RuntimeFault(
                 f"dirección fuera de rango ({value}): {name} debe estar en {{-1, 0, 1}}",
                 line=line, col=col, filename=filename,
+                code="E_RUN_005",
             )
 
 
@@ -46,6 +47,7 @@ class Action(ABC):
                 f"la acción '{self.name}' espera {self.arity} argumentos, "
                 f"se encontraron {len(args)}",
                 line=line, col=col, filename=filename,
+                code="E_RUN_006",
             )
         self.check(ctx, args, line, col, filename)
         self.apply(ctx, args, line, col, filename)
@@ -70,6 +72,7 @@ class Wait(Action):
             raise RuntimeFault(
                 "wait espera n >= 1",
                 line=line, col=col, filename=filename,
+                code="E_RUN_001",
             )
 
     def apply(self, ctx, args, line=None, col=None, filename=None):
