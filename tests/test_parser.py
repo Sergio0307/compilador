@@ -326,22 +326,22 @@ def test_statement():
          "right=Number(value=20, line=1, col=13), line=1, col=11), label='flee', line=1, col=1)"),
         ("if see(x, y + 1) != GROUND goto wander",
          "IfGoto(condition=BinaryOp(op='!=', left=Call(name='see', args=["
-         "Identifier(name='x', line=1, col=5), BinaryOp(op='+', "
-         "left=Identifier(name='y', line=1, col=8), right=Number(value=1, line=1, col=12), "
-         "line=1, col=10)], line=1, col=1), right=Identifier(name='GROUND', line=1, col=14), "
-         "line=1, col=12), label='wander', line=1, col=1)"),
+         "Identifier(name='x', line=1, col=8), BinaryOp(op='+', "
+         "left=Identifier(name='y', line=1, col=11), right=Number(value=1, line=1, col=15), "
+         "line=1, col=13)], line=1, col=4), right=Identifier(name='GROUND', line=1, col=21), "
+         "line=1, col=18), label='wander', line=1, col=1)"),
         ("steps = steps + 1",
          "Assign(name='steps', expr=BinaryOp(op='+', "
-         "left=Identifier(name='steps', line=1, col=1), right=Number(value=1, line=1, col=10), "
-         "line=1, col=6), line=1, col=6)"),
+         "left=Identifier(name='steps', line=1, col=9), right=Number(value=1, line=1, col=17), "
+         "line=1, col=15), line=1, col=7)"),
         ('say("meat is back")',
-         "Call(name='say', args=[String(value='meat is back', line=1, col=1)], line=1, col=1)"),
+         "Call(name='say', args=[String(value='meat is back', line=1, col=5)], line=1, col=1)"),
         ("wait()", "Call(name='wait', args=[], line=1, col=1)"),
         ("move(-enemy_dx, -enemy_dy, 3)",
          "Call(name='move', args=[UnaryOp(op='-', "
-         "operand=Identifier(name='enemy_dx', line=1, col=2), line=1, col=1), "
-         "UnaryOp(op='-', operand=Identifier(name='enemy_dy', line=1, col=2), line=1, col=1), "
-         "Number(value=3, line=1, col=24)], line=1, col=1)"),
+         "operand=Identifier(name='enemy_dx', line=1, col=7), line=1, col=6), "
+         "UnaryOp(op='-', operand=Identifier(name='enemy_dy', line=1, col=18), line=1, col=17), "
+         "Number(value=3, line=1, col=28)], line=1, col=1)"),
     ]
     for src, esperado in casos:
         p, node = parse(src)
