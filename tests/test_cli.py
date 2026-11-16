@@ -4,7 +4,7 @@
 import pytest
 import tempfile
 import os
-from main import main
+from cli.main import main
 
 
 # Especies de prueba simples
