@@ -20,7 +20,7 @@ Nada de esto importa world/: el mundo entra por parámetro.
 from lang.ast_nodes import Goto, IfGoto, Assign, Call
 from lang.catalog import CONSTANTS, PERCEPTIONS
 from lang.errors import RuntimeFault
-from lang.values import binary, unary, is_truthy
+from lang.values import binary, unary, is_truthy, require_numbers
 from lang.actions import ACTION_BY_NAME
 
 MAX_INSTRUCTIONS = 100   # spec 2.7
@@ -30,12 +30,9 @@ MAX_INSTRUCTIONS = 100   # spec 2.7
 # Funciones reservadas (spec 2.6)
 # --------------------------------------------------------------------------
 
-def _require_coords(fname, x, y, line):
+def _require_coords(fname, x, y, line=None):
     """see()/name() esperan coordenadas numéricas, no texto."""
-    if isinstance(x, str) or isinstance(y, str):
-        raise RuntimeFault(
-            f"la función '{fname}' espera coordenadas numéricas", line=line
-        )
+    require_numbers([x, y], line=line, context=fname)
 
 
 def _see(ctx, args, line):

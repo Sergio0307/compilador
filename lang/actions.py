@@ -12,24 +12,21 @@ Esta devuelve si la acción consume el turno (todas salvo `say`).
 from abc import ABC, abstractmethod
 
 from lang.errors import RuntimeFault
+from lang.values import require_numbers
 
 
-def _require_numbers(args, line):
-    """Las acciones que esperan números rechazan el texto (spec 2.5)."""
-    for value in args:
-        if isinstance(value, str):
-            raise RuntimeFault(
-                "se esperaba un número, se recibió texto", line=line
-            )
+def _require_numbers(args, line=None, context=""):
+    """Valida que todos los args sean números (delegado a values.require_numbers)."""
+    require_numbers(args, line=line, context=context)
 
 
-def _require_directions(dx, dy, line):
-    """dx y dy deben estar en {-1, 0, 1}; si no, error de ejecución."""
-    for value in (dx, dy):
+def _require_directions(dx, dy, line=None, context=""):
+    """Valida que dx, dy sean números y estén en {-1, 0, 1}."""
+    _require_numbers([dx, dy], line=line, context=context)
+    for value, name in ((dx, "dx"), (dy, "dy")):
         if value not in (-1, 0, 1):
             raise RuntimeFault(
-                f"dirección fuera de rango ({value}): dx y dy deben estar "
-                f"en {{-1, 0, 1}}",
+                f"dirección fuera de rango ({value}): {name} debe estar en {{-1, 0, 1}}",
                 line=line,
             )
 

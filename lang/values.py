@@ -56,6 +56,29 @@ def _reject_zero(divisor, line):
         raise RuntimeFault("división por cero", line=line)
 
 
+def require_numbers(args, line=None, context=""):
+    """
+    Valida que todos los valores en `args` sean enteros (no strings).
+    
+    Args:
+        args: lista de valores a validar
+        line: línea del código fuente (para error)
+        context: nombre de la acción/función/operador (para mensaje)
+    """
+    for value in args:
+        if isinstance(value, str):
+            ctx = f" en '{context}'" if context else ""
+            raise RuntimeFault(
+                f"se esperaba un número{ctx}, se recibió texto",
+                line=line,
+            )
+
+
+def _check_number(op, value, line=None):
+    """Compatibilidad: delega en require_numbers (un solo valor)."""
+    require_numbers([value], line=line, context=op)
+
+
 # --------------------------------------------------------------------------
 # Operadores binarios
 # --------------------------------------------------------------------------
