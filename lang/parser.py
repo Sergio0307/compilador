@@ -1,3 +1,5 @@
+# lang/parser.py — REEMPLAZAR COMPLETO
+
 from lang.tokens import Token, TokenType
 from lang.ast_nodes import (
     SpeciesDef, Block,
@@ -11,6 +13,7 @@ COMPARISON_TYPES = (
     TokenType.GT, TokenType.GE,
     TokenType.EQ, TokenType.NEQ,
 )
+
 
 class Parser:
     def __init__(self, tokens, filename="<input>"):
@@ -64,6 +67,7 @@ class Parser:
             raise ParseError(
                 f"se esperaba {ttype.name}, se encontró {tok.type.name} ({tok.value!r})",
                 line=tok.line, col=tok.col, filename=self.filename,
+                code="E_PAR_001",
             )
         return self.advance()
 
@@ -97,12 +101,14 @@ class Parser:
                 f"se esperaba un valor (nombre o número), se encontró "
                 f"{tok.type.name} ({tok.value!r})",
                 line=tok.line, col=tok.col, filename=self.filename,
+                code="E_PAR_002",
             )
         self.advance()
         if neg and tok.type != TokenType.NUMBER:
             raise ParseError(
                 f"después de '-' se esperaba un número, se encontró ({tok.value!r})",
                 line=tok.line, col=tok.col, filename=self.filename,
+                code="E_PAR_003",
             )
         return ("-" if neg else "") + tok.value
 
@@ -121,6 +127,7 @@ class Parser:
                     "falta la etiqueta 'start:'",
                     line=self.peek().line, col=self.peek().col,
                     filename=self.filename,
+                    code="E_PAR_004",
                 )
 
             # Fin de la cabecera: aparece 'start:'
@@ -130,6 +137,7 @@ class Parser:
                         "la primera línea no vacía debe ser 'creature <nombre>'",
                         line=self.peek().line, col=self.peek().col,
                         filename=self.filename,
+                        code="E_PAR_005",
                     )
                 break
 
@@ -140,6 +148,7 @@ class Parser:
                     f"se esperaba una clave de cabecera (id valor), se encontró "
                     f"{key.type.name} ({key.value!r})",
                     line=key.line, col=key.col, filename=self.filename,
+                    code="E_PAR_006",
                 )
 
             # La primera línea no vacía debe ser 'creature <nombre>'
@@ -148,6 +157,7 @@ class Parser:
                     f"la primera línea de la cabecera debe ser 'creature <nombre>', "
                     f"se encontró ({key.value!r})",
                     line=key.line, col=key.col, filename=self.filename,
+                    code="E_PAR_007",
                 )
 
             self.advance()
@@ -161,6 +171,7 @@ class Parser:
                     f"se esperaba fin de línea, se encontró "
                     f"{fin.type.name} ({fin.value!r})",
                     line=fin.line, col=fin.col, filename=self.filename,
+                    code="E_PAR_008",
                 )
             self.match(TokenType.NEWLINE)
 
@@ -206,7 +217,8 @@ class Parser:
                 if node.name in blocks or node.name == current_label:
                     raise ParseError(
                         f"etiqueta duplicada '{node.name}'",
-                        line=node.line, col=None, filename=self.filename,
+                        line=node.line, col=node.col, filename=self.filename,
+                        code="E_PAR_009",
                     )
                 if current_label is not None:
                     blocks[current_label] = Block(current_label, current_instructions)
@@ -217,7 +229,8 @@ class Parser:
                 raise ParseError(
                     f"instrucción '{node.__class__.__name__}' antes de la "
                     f"primera etiqueta",
-                    line=node.line, col=None, filename=self.filename,
+                    line=node.line, col=node.col, filename=self.filename,
+                    code="E_PAR_010",
                 )
             else:
                 current_instructions.append(node)
@@ -270,11 +283,13 @@ class Parser:
                 f"línea no válida: se esperaba ':', '=' o '(' después de "
                 f"{tok.value!r}, se encontró {nxt.type.name} ({nxt.value!r})",
                 line=nxt.line, col=nxt.col, filename=self.filename,
+                code="E_PAR_011",
             )
         raise ParseError(
             f"se esperaba una instrucción (etiqueta, goto, if, asignación "
             f"o acción), se encontró {tok.type.name} ({tok.value!r})",
             line=tok.line, col=tok.col, filename=self.filename,
+            code="E_PAR_012",
         )
 
     def parse_statement(self):
@@ -289,6 +304,7 @@ class Parser:
                 f"se esperaba fin de línea, se encontró "
                 f"{fin.type.name} ({fin.value!r})",
                 line=fin.line, col=fin.col, filename=self.filename,
+                code="E_PAR_013",
             )
         self.match(TokenType.NEWLINE)
         return node
@@ -316,6 +332,7 @@ class Parser:
                 f"después de la expresión de 'if' se esperaba 'goto', "
                 f"se encontró {tok.type.name} ({tok.value!r})",
                 line=tok.line, col=tok.col, filename=self.filename,
+                code="E_PAR_014",
             )
         self.advance()
         name_tok = self._expect_label_name()
@@ -336,6 +353,7 @@ class Parser:
                 f"se esperaba el nombre de una etiqueta, "
                 f"se encontró {tok.type.name} ({tok.value!r})",
                 line=tok.line, col=tok.col, filename=self.filename,
+                code="E_PAR_015",
             )
         return self.advance()
 
@@ -351,6 +369,7 @@ class Parser:
             raise ParseError(
                 "asignaciones encadenadas no permitidas (x = y = ...)",
                 line=tok.line, col=tok.col, filename=self.filename,
+                code="E_PAR_016",
             )
         return Assign(name_tok.value, expr, line=eq.line, col=eq.col)
 
@@ -391,6 +410,7 @@ class Parser:
         raise ParseError(
             f"se esperaba una expresion, se encontro {tok.type.name} ({tok.value!r})",
             line=tok.line, col=tok.col, filename=self.filename,
+            code="E_PAR_017",
         )
 
     def parse_call_args(self, name_tok):
@@ -478,7 +498,3 @@ class Parser:
     def parse_expression(self):
         """Punto de entrada para cualquier expresion."""
         return self.parse_or()
-    
-    
-    
-    
