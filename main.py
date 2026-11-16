@@ -35,6 +35,9 @@ def cargar(path):
     except InstinctError as error:
         print(f"error: {error}", file=sys.stderr)
         raise SystemExit(1)
+    except Exception as error:  # 4.3: Red de seguridad para bugs internos
+        print(f"error interno en {path}: {error}", file=sys.stderr)
+        raise SystemExit(1)
 
 
 def main(argv=None):
